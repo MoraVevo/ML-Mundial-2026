@@ -301,10 +301,9 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "rating_drift_abs",
     "match_script_compatibility_edge",
     "clinical_low_block_matchup_edge",
-    "club_star_finisher_edge",
 ]
 NEUTRAL_MODEL_RECIPE = (
-    "parsimonious_live_fifa_drift_abs_match_script_bilateral_clinical_low_block_w12_guardrail_residual_friendly_weight_060_club_star_finisher_fd_fallback"
+    "parsimonious_live_fifa_drift_abs_match_script_bilateral_clinical_low_block_w12_guardrail_residual_friendly_weight_060"
 )
 NEUTRAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
 NEUTRAL_CANDIDATE_FEATURES = [
@@ -347,7 +346,6 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "attack_core_edge",
     "personnel_coverage_pair",
     "club_attack_talent_edge",
-    "club_star_finisher_edge",
     "club_talent_coverage_pair",
 ]
 NEUTRAL_EXPORT_FEATURES = list(
@@ -2114,10 +2112,6 @@ def _build_neutral_frame(frame: pd.DataFrame, *, augment: bool) -> pd.DataFrame:
                         a["team_club_attack_talent_signal"]
                     )
                     - num(b["team_club_attack_talent_signal"]),
-                    "club_star_finisher_edge": num(
-                        a["team_club_star_finisher_signal"]
-                    )
-                    - num(b["team_club_star_finisher_signal"]),
                     "club_talent_coverage_pair": min(
                         num(a["team_club_attack_coverage"]),
                         num(b["team_club_attack_coverage"]),

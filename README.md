@@ -63,6 +63,12 @@ Para generar predicciones de los proximos partidos:
 python scripts\predict_next4_with_all_played_worldcup.py --limit 4
 ```
 
+## Evaluacion del modelo
+
+El reporte tecnico con cortes temporales, metricas, matrices de confusion,
+analisis de error e importancia de features esta en
+[`docs/model_evaluation.md`](docs/model_evaluation.md).
+
 ## Modelo
 
 El modelo de produccion es neutral y usa variables prepartido. La receta actual

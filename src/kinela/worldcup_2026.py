@@ -1497,8 +1497,6 @@ class WorldCup2026Simulator:
             "team_b_club_attack_coverage": b["club_attack_coverage"],
             "club_attack_talent_edge": float(a["club_attack_talent_signal"])
             - float(b["club_attack_talent_signal"]),
-            "club_star_finisher_edge": float(a["club_star_finisher_signal"])
-            - float(b["club_star_finisher_signal"]),
             "club_talent_coverage_pair": min(
                 float(a["club_attack_coverage"]),
                 float(b["club_attack_coverage"]),

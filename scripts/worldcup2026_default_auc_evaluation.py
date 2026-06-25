@@ -32,7 +32,7 @@ def main() -> None:
     split_clean, split_info = _split_worldcup_2026(training, clean)
     result = _evaluate(
         "worldcup_2026",
-        "World Cup 2026 holdout",
+        "Holdout Mundial 2026",
         split_info["policy"],
         data_root,
         training,

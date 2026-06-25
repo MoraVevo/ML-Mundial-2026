@@ -1,6 +1,6 @@
 {
   "model": "lightgbm_neutral_parsimonious",
-  "feature_recipe": "parsimonious_live_fifa_drift_abs_match_script_bilateral_clinical_low_block_w12_guardrail_residual_friendly_weight_060_club_star_finisher_fd_fallback",
+  "feature_recipe": "parsimonious_live_fifa_drift_abs_match_script_bilateral_clinical_low_block_w12_guardrail_residual_friendly_weight_060",
   "features": [
     "competition_family",
     "stage_or_round",
@@ -12,192 +12,179 @@
     "rating_guardrail_edge",
     "rating_drift_abs",
     "match_script_compatibility_edge",
-    "clinical_low_block_matchup_edge",
-    "club_star_finisher_edge"
+    "clinical_low_block_matchup_edge"
   ],
   "evaluations": [
     {
       "name": "worldcup_2026",
-      "title": "World Cup 2026 holdout",
-      "policy": "Played World Cup 2026 matches are forced to test. Training uses only national-team matches before the first World Cup 2026 match; same-date and later rows are excluded.",
+      "title": "Holdout Mundial 2026",
+      "policy": "Los partidos jugados del Mundial 2026 se fuerzan como test. El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; filas de la misma fecha o posteriores se excluyen.",
       "train_matches": 787,
       "test_matches": 54,
       "test_start": "2026-06-11",
       "test_end": "2026-06-25",
       "metrics": {
-        "accuracy": 0.5741,
-        "correct": 31,
-        "log_loss": 0.9453,
-        "mae_team_a_goals": 1.1564,
-        "mae_team_b_goals": 0.865,
-        "mae_goals_avg": 1.0107
+        "accuracy": 0.537,
+        "correct": 29,
+        "log_loss": 0.9762,
+        "mae_team_a_goals": 1.1763,
+        "mae_team_b_goals": 0.8515,
+        "mae_goals_avg": 1.0139
       },
       "confusion": [
         [
-          22,
+          19,
           0,
-          7
+          10
         ],
         [
-          12,
+          11,
           0,
-          2
+          3
         ],
         [
-          2,
+          1,
           0,
-          9
+          10
         ]
       ],
       "feature_importances": {
         "result_classifier": [
           {
             "feature": "draw_pressure_index",
-            "importance": 2567.6666666666665
-          },
-          {
-            "feature": "rating_guardrail_edge",
-            "importance": 2207.0
+            "importance": 2670.0
           },
           {
             "feature": "quality_form_edge",
-            "importance": 2166.0
+            "importance": 2282.6666666666665
+          },
+          {
+            "feature": "rating_guardrail_edge",
+            "importance": 2274.0
           },
           {
             "feature": "score_control_value_edge",
-            "importance": 2162.3333333333335
-          },
-          {
-            "feature": "clinical_low_block_matchup_edge",
-            "importance": 2079.0
+            "importance": 2194.6666666666665
           },
           {
             "feature": "rating_drift_abs",
-            "importance": 2047.6666666666667
+            "importance": 2089.6666666666665
+          },
+          {
+            "feature": "clinical_low_block_matchup_edge",
+            "importance": 2071.0
           },
           {
             "feature": "match_script_compatibility_edge",
-            "importance": 1998.6666666666667
+            "importance": 2018.0
           },
           {
             "feature": "rating_threat_edge",
-            "importance": 1894.0
+            "importance": 1825.0
           },
           {
             "feature": "goal_balance_edge",
-            "importance": 1745.6666666666667
+            "importance": 1662.3333333333333
           },
           {
             "feature": "stage_or_round",
-            "importance": 439.6666666666667
-          },
-          {
-            "feature": "club_star_finisher_edge",
-            "importance": 229.33333333333334
+            "importance": 441.3333333333333
           },
           {
             "feature": "competition_family",
-            "importance": 89.66666666666667
+            "importance": 98.66666666666667
           }
         ],
         "team_a_goals": [
           {
             "feature": "rating_threat_edge",
-            "importance": 1174.0
+            "importance": 1178.0
           },
           {
             "feature": "match_script_compatibility_edge",
-            "importance": 882.0
+            "importance": 913.0
           },
           {
             "feature": "score_control_value_edge",
             "importance": 881.0
           },
           {
-            "feature": "clinical_low_block_matchup_edge",
-            "importance": 842.0
-          },
-          {
             "feature": "rating_guardrail_edge",
-            "importance": 809.0
+            "importance": 869.0
           },
           {
             "feature": "quality_form_edge",
-            "importance": 747.0
+            "importance": 815.0
           },
           {
-            "feature": "draw_pressure_index",
-            "importance": 686.0
+            "feature": "clinical_low_block_matchup_edge",
+            "importance": 801.0
           },
           {
             "feature": "goal_balance_edge",
-            "importance": 666.0
+            "importance": 683.0
+          },
+          {
+            "feature": "draw_pressure_index",
+            "importance": 670.0
           },
           {
             "feature": "rating_drift_abs",
-            "importance": 563.0
+            "importance": 579.0
           },
           {
             "feature": "stage_or_round",
-            "importance": 237.0
-          },
-          {
-            "feature": "club_star_finisher_edge",
-            "importance": 132.0
+            "importance": 264.0
           },
           {
             "feature": "competition_family",
-            "importance": 81.0
+            "importance": 47.0
           }
         ],
         "team_b_goals": [
           {
             "feature": "rating_threat_edge",
-            "importance": 1158.0
+            "importance": 1188.0
           },
           {
             "feature": "match_script_compatibility_edge",
-            "importance": 955.0
-          },
-          {
-            "feature": "clinical_low_block_matchup_edge",
-            "importance": 910.0
+            "importance": 880.0
           },
           {
             "feature": "score_control_value_edge",
-            "importance": 807.0
-          },
-          {
-            "feature": "rating_guardrail_edge",
-            "importance": 757.0
+            "importance": 850.0
           },
           {
             "feature": "quality_form_edge",
-            "importance": 739.0
+            "importance": 834.0
+          },
+          {
+            "feature": "clinical_low_block_matchup_edge",
+            "importance": 834.0
+          },
+          {
+            "feature": "rating_guardrail_edge",
+            "importance": 792.0
           },
           {
             "feature": "goal_balance_edge",
-            "importance": 715.0
+            "importance": 757.0
           },
           {
             "feature": "draw_pressure_index",
-            "importance": 624.0
+            "importance": 653.0
           },
           {
             "feature": "rating_drift_abs",
-            "importance": 559.0
+            "importance": 590.0
           },
           {
             "feature": "stage_or_round",
-            "importance": 248.0
-          },
-          {
-            "feature": "club_star_finisher_edge",
-            "importance": 155.0
+            "importance": 261.0
           },
           {
             "feature": "competition_family",
-            "importance": 73.0
+            "importance": 61.0
           }
         ]
       },
@@ -208,12 +195,65 @@
         "home": 29,
         "draw": 14,
         "away": 11
+      },
+      "error_analysis": {
+        "by_competition": [
+          {
+            "group": "FIFA World Cup",
+            "matches": 54,
+            "accuracy": 0.537,
+            "log_loss": 0.9762,
+            "mae_team_a_goals": 1.1763,
+            "mae_team_b_goals": 0.8515,
+            "mae_goals_avg": 1.0139
+          }
+        ],
+        "by_stage": [
+          {
+            "group": "GROUP_STAGE",
+            "matches": 54,
+            "accuracy": 0.537,
+            "log_loss": 0.9762,
+            "mae_team_a_goals": 1.1763,
+            "mae_team_b_goals": 0.8515,
+            "mae_goals_avg": 1.0139
+          }
+        ],
+        "by_result": [
+          {
+            "group": "Equipo A",
+            "matches": 29,
+            "accuracy": 0.6552,
+            "log_loss": null,
+            "mae_team_a_goals": 1.3875,
+            "mae_team_b_goals": 0.7993,
+            "mae_goals_avg": 1.0934
+          },
+          {
+            "group": "Equipo B",
+            "matches": 11,
+            "accuracy": 0.9091,
+            "log_loss": null,
+            "mae_team_a_goals": 0.7719,
+            "mae_team_b_goals": 1.316,
+            "mae_goals_avg": 1.0439
+          },
+          {
+            "group": "Empate",
+            "matches": 14,
+            "accuracy": 0.0,
+            "log_loss": null,
+            "mae_team_a_goals": 1.0565,
+            "mae_team_b_goals": 0.5947,
+            "mae_goals_avg": 0.8256
+          }
+        ]
       }
     },
     {
       "name": "external_random_temporal",
-      "title": "External random temporal holdout",
-      "policy": "Random holdout of 104 non-friendly, non-World-Cup-2026 national matches from the recent official-match pool, seed=42. Training uses only matches before the earliest selected test date; same-date and later non-selected rows are excluded.",
+      "title": "Holdout externo random temporal",
+      "policy": "Holdout random de 104 partidos nacionales no amistosos y fuera del Mundial 2026, tomados del pool reciente de partidos oficiales, seed=42. El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test; filas no seleccionadas de la misma fecha o posteriores se excluyen.",
       "train_matches": 565,
       "test_matches": 104,
       "test_start": "2024-09-07",
@@ -288,10 +328,6 @@
           {
             "feature": "competition_family",
             "importance": 81.66666666666667
-          },
-          {
-            "feature": "club_star_finisher_edge",
-            "importance": 0.0
           }
         ],
         "team_a_goals": [
@@ -338,10 +374,6 @@
           {
             "feature": "competition_family",
             "importance": 44.0
-          },
-          {
-            "feature": "club_star_finisher_edge",
-            "importance": 0.0
           }
         ],
         "team_b_goals": [
@@ -388,10 +420,6 @@
           {
             "feature": "competition_family",
             "importance": 39.0
-          },
-          {
-            "feature": "club_star_finisher_edge",
-            "importance": 0.0
           }
         ]
       },
@@ -407,6 +435,239 @@
         "home": 45,
         "away": 37,
         "draw": 22
+      },
+      "error_analysis": {
+        "by_competition": [
+          {
+            "group": "World Cup - Qualification Europe",
+            "matches": 40,
+            "accuracy": 0.825,
+            "log_loss": 0.7719,
+            "mae_team_a_goals": 1.2239,
+            "mae_team_b_goals": 1.0468,
+            "mae_goals_avg": 1.1353
+          },
+          {
+            "group": "World Cup - Qualification Africa",
+            "matches": 19,
+            "accuracy": 0.7895,
+            "log_loss": 0.8,
+            "mae_team_a_goals": 0.9604,
+            "mae_team_b_goals": 1.2187,
+            "mae_goals_avg": 1.0896
+          },
+          {
+            "group": "UEFA Nations League",
+            "matches": 29,
+            "accuracy": 0.4483,
+            "log_loss": 1.0566,
+            "mae_team_a_goals": 0.8845,
+            "mae_team_b_goals": 0.9754,
+            "mae_goals_avg": 0.93
+          },
+          {
+            "group": "African Nations Championship - Qualification",
+            "matches": 2,
+            "accuracy": 0.5,
+            "log_loss": null,
+            "mae_team_a_goals": 0.5666,
+            "mae_team_b_goals": 1.257,
+            "mae_goals_avg": 0.9118
+          },
+          {
+            "group": "CONCACAF Nations League",
+            "matches": 9,
+            "accuracy": 0.6667,
+            "log_loss": 0.9229,
+            "mae_team_a_goals": 0.6149,
+            "mae_team_b_goals": 1.1211,
+            "mae_goals_avg": 0.868
+          },
+          {
+            "group": "Gulf Cup of Nations",
+            "matches": 5,
+            "accuracy": 0.2,
+            "log_loss": 1.1903,
+            "mae_team_a_goals": 0.7472,
+            "mae_team_b_goals": 0.7638,
+            "mae_goals_avg": 0.7555
+          }
+        ],
+        "by_stage": [
+          {
+            "group": "League A - 1",
+            "matches": 1,
+            "accuracy": 1.0,
+            "log_loss": null,
+            "mae_team_a_goals": 3.1572,
+            "mae_team_b_goals": 1.2302,
+            "mae_goals_avg": 2.1937
+          },
+          {
+            "group": "League B - 6",
+            "matches": 1,
+            "accuracy": 1.0,
+            "log_loss": null,
+            "mae_team_a_goals": 2.4988,
+            "mae_team_b_goals": 0.8822,
+            "mae_goals_avg": 1.6905
+          },
+          {
+            "group": "League A - 5",
+            "matches": 2,
+            "accuracy": 1.0,
+            "log_loss": 0.6434,
+            "mae_team_a_goals": 2.2743,
+            "mae_team_b_goals": 0.7022,
+            "mae_goals_avg": 1.4883
+          },
+          {
+            "group": "GROUP_STAGE",
+            "matches": 61,
+            "accuracy": 0.7869,
+            "log_loss": 0.7969,
+            "mae_team_a_goals": 1.0822,
+            "mae_team_b_goals": 1.103,
+            "mae_goals_avg": 1.0926
+          },
+          {
+            "group": "Play-offs A/B",
+            "matches": 3,
+            "accuracy": 0.0,
+            "log_loss": 1.4196,
+            "mae_team_a_goals": 1.2841,
+            "mae_team_b_goals": 0.825,
+            "mae_goals_avg": 1.0546
+          },
+          {
+            "group": "League A - 2",
+            "matches": 2,
+            "accuracy": 0.5,
+            "log_loss": 1.0469,
+            "mae_team_a_goals": 0.3279,
+            "mae_team_b_goals": 1.7322,
+            "mae_goals_avg": 1.03
+          },
+          {
+            "group": "SEMI_FINALS",
+            "matches": 4,
+            "accuracy": 0.5,
+            "log_loss": 0.9984,
+            "mae_team_a_goals": 1.3797,
+            "mae_team_b_goals": 0.6402,
+            "mae_goals_avg": 1.0099
+          },
+          {
+            "group": "QUARTER_FINALS",
+            "matches": 9,
+            "accuracy": 0.3333,
+            "log_loss": 1.0716,
+            "mae_team_a_goals": 0.7508,
+            "mae_team_b_goals": 1.1954,
+            "mae_goals_avg": 0.9731
+          },
+          {
+            "group": "2nd Round",
+            "matches": 2,
+            "accuracy": 0.5,
+            "log_loss": null,
+            "mae_team_a_goals": 0.5666,
+            "mae_team_b_goals": 1.257,
+            "mae_goals_avg": 0.9118
+          },
+          {
+            "group": "League A - 4",
+            "matches": 6,
+            "accuracy": 0.5,
+            "log_loss": 1.0967,
+            "mae_team_a_goals": 0.6547,
+            "mae_team_b_goals": 1.0906,
+            "mae_goals_avg": 0.8726
+          },
+          {
+            "group": "League A - 6",
+            "matches": 3,
+            "accuracy": 0.0,
+            "log_loss": 1.4207,
+            "mae_team_a_goals": 0.3321,
+            "mae_team_b_goals": 1.2668,
+            "mae_goals_avg": 0.7995
+          },
+          {
+            "group": "League B - 5",
+            "matches": 1,
+            "accuracy": 1.0,
+            "log_loss": null,
+            "mae_team_a_goals": 0.3563,
+            "mae_team_b_goals": 0.9513,
+            "mae_goals_avg": 0.6538
+          },
+          {
+            "group": "THIRD_PLACE",
+            "matches": 1,
+            "accuracy": 1.0,
+            "log_loss": null,
+            "mae_team_a_goals": 1.0572,
+            "mae_team_b_goals": 0.2102,
+            "mae_goals_avg": 0.6337
+          },
+          {
+            "group": "League B - 4",
+            "matches": 1,
+            "accuracy": 1.0,
+            "log_loss": null,
+            "mae_team_a_goals": 0.0629,
+            "mae_team_b_goals": 1.0527,
+            "mae_goals_avg": 0.5578
+          },
+          {
+            "group": "FINAL",
+            "matches": 1,
+            "accuracy": 1.0,
+            "log_loss": null,
+            "mae_team_a_goals": 0.2713,
+            "mae_team_b_goals": 0.8412,
+            "mae_goals_avg": 0.5562
+          },
+          {
+            "group": "League A - 3",
+            "matches": 6,
+            "accuracy": 0.5,
+            "log_loss": 1.0356,
+            "mae_team_a_goals": 0.4087,
+            "mae_team_b_goals": 0.6274,
+            "mae_goals_avg": 0.5181
+          }
+        ],
+        "by_result": [
+          {
+            "group": "Equipo A",
+            "matches": 45,
+            "accuracy": 0.8,
+            "log_loss": null,
+            "mae_team_a_goals": 1.3552,
+            "mae_team_b_goals": 0.7892,
+            "mae_goals_avg": 1.0722
+          },
+          {
+            "group": "Empate",
+            "matches": 22,
+            "accuracy": 0.0,
+            "log_loss": null,
+            "mae_team_a_goals": 0.7525,
+            "mae_team_b_goals": 1.259,
+            "mae_goals_avg": 1.0057
+          },
+          {
+            "group": "Equipo B",
+            "matches": 37,
+            "accuracy": 0.8919,
+            "log_loss": null,
+            "mae_team_a_goals": 0.6952,
+            "mae_team_b_goals": 1.2574,
+            "mae_goals_avg": 0.9763
+          }
+        ]
       }
     }
   ]

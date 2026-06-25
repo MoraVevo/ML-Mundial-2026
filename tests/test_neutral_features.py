@@ -67,10 +67,6 @@ def test_recent_points_form_is_direct_and_quality_form_remains_contextual() -> N
     assert "recent_points_form_edge" not in NEUTRAL_FEATURES
 
 
-def test_club_star_finisher_edge_is_active_for_neutral_model() -> None:
-    assert "club_star_finisher_edge" in NEUTRAL_FEATURES
-
-
 def test_calibrated_classifier_importances_are_reported() -> None:
     class Estimator:
         feature_importances_ = [2.0, 5.0]

@@ -36,7 +36,7 @@ from kinela.lightgbm_model import (  # noqa: E402
 )
 
 
-RESULT_LABELS = ["team_a", "draw", "team_b"]
+RESULT_LABELS = ["Equipo A", "Empate", "Equipo B"]
 RANDOM_SEED = 42
 EXTERNAL_TEST_MATCHES = 104
 
@@ -78,6 +78,7 @@ class EvaluationResult:
     feature_importances: dict[str, list[dict[str, Any]]]
     test_competitions: dict[str, int]
     result_distribution: dict[str, int]
+    error_analysis: dict[str, list[dict[str, Any]]]
 
 
 def _load_frames(data_root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -201,6 +202,31 @@ def _importances(model: Any, features: list[str]) -> list[dict[str, Any]]:
     )
 
 
+def _group_errors(frame: pd.DataFrame, group_col: str, min_matches: int = 1) -> list[dict[str, Any]]:
+    label_map = {"home": "Equipo A", "draw": "Empate", "away": "Equipo B"}
+    rows: list[dict[str, Any]] = []
+    for value, group in frame.groupby(group_col, dropna=False):
+        if len(group) < min_matches:
+            continue
+        rows.append(
+            {
+                "group": label_map.get(str(value), str(value)),
+                "matches": int(len(group)),
+                "accuracy": round(float((group["actual_label"] == group["predicted_label"]).mean()), 4),
+                "log_loss": round(
+                    float(log_loss(group["actual_label"], group[["p_a", "p_draw", "p_b"]], labels=[0, 1, 2])),
+                    4,
+                )
+                if len(set(group["actual_label"])) > 1
+                else None,
+                "mae_team_a_goals": round(float(group["abs_error_a"].mean()), 4),
+                "mae_team_b_goals": round(float(group["abs_error_b"].mean()), 4),
+                "mae_goals_avg": round(float(group["abs_error_avg"].mean()), 4),
+            }
+        )
+    return sorted(rows, key=lambda item: (-float(item["mae_goals_avg"]), -int(item["matches"])))
+
+
 def _evaluate(
     name: str,
     title: str,
@@ -254,6 +280,21 @@ def _evaluate(
     mae_b = float(mean_absolute_error(test["team_b_goals"], pred_b))
     test_dates = pd.to_datetime(training.loc[split_clean["split"].eq("test"), "date"])
     test_training_rows = training.loc[split_clean["split"].eq("test")]
+    details = test_training_rows[
+        ["date", "competition_name", "competition_family", "competition_type", "stage_or_round", "result"]
+    ].reset_index(drop=True)
+    details["actual_label"] = labels
+    details["predicted_label"] = predicted
+    details["p_a"] = probabilities[:, 0]
+    details["p_draw"] = probabilities[:, 1]
+    details["p_b"] = probabilities[:, 2]
+    details["team_a_goals"] = test["team_a_goals"].to_numpy()
+    details["team_b_goals"] = test["team_b_goals"].to_numpy()
+    details["pred_team_a_goals"] = pred_a
+    details["pred_team_b_goals"] = pred_b
+    details["abs_error_a"] = np.abs(details["team_a_goals"] - details["pred_team_a_goals"])
+    details["abs_error_b"] = np.abs(details["team_b_goals"] - details["pred_team_b_goals"])
+    details["abs_error_avg"] = (details["abs_error_a"] + details["abs_error_b"]) / 2.0
 
     metrics = {
         "accuracy": round(float(accuracy_score(labels, predicted)), 4),
@@ -285,6 +326,11 @@ def _evaluate(
         result_distribution={
             str(key): int(value)
             for key, value in test_training_rows["result"].value_counts().items()
+        },
+        error_analysis={
+            "by_competition": _group_errors(details, "competition_name"),
+            "by_stage": _group_errors(details, "stage_or_round"),
+            "by_result": _group_errors(details, "result"),
         },
     )
 
@@ -321,9 +367,9 @@ def _plot_metrics(results: list[EvaluationResult], asset_dir: Path) -> None:
 
     fig, axes = plt.subplots(1, 3, figsize=(12, 4))
     for ax, values, title, ylabel in [
-        (axes[0], accuracy, "Accuracy", "higher is better"),
-        (axes[1], logloss, "Log loss", "lower is better"),
-        (axes[2], mae, "Goal MAE", "lower is better"),
+        (axes[0], accuracy, "Accuracy", "mas alto es mejor"),
+        (axes[1], logloss, "Log loss", "mas bajo es mejor"),
+        (axes[2], mae, "MAE de goles", "mas bajo es mejor"),
     ]:
         ax.bar(labels, values, color=colors, width=0.58)
         ax.set_title(title)
@@ -331,7 +377,7 @@ def _plot_metrics(results: list[EvaluationResult], asset_dir: Path) -> None:
         ax.grid(axis="y", alpha=0.22)
         ax.tick_params(axis="x", rotation=0)
         _bar_label(ax, values)
-    fig.suptitle("Model evaluation summary", fontsize=15, fontweight="bold", y=1.04)
+    fig.suptitle("Resumen de evaluacion del modelo", fontsize=15, fontweight="bold", y=1.04)
     fig.tight_layout()
     fig.savefig(asset_dir / "metrics_summary.png")
     plt.close(fig)
@@ -340,15 +386,26 @@ def _plot_metrics(results: list[EvaluationResult], asset_dir: Path) -> None:
 def _plot_confusion(result: EvaluationResult, asset_dir: Path) -> None:
     matrix = np.asarray(result.confusion)
     fig, ax = plt.subplots(figsize=(5.2, 4.6))
-    image = ax.imshow(matrix, cmap="YlGnBu")
-    ax.set_title(f"Confusion matrix: {result.title}")
+    image = ax.imshow(matrix, cmap="Blues", vmin=0, vmax=max(1, int(matrix.max())))
+    ax.set_title(f"Matriz de confusion: {result.title}")
     ax.set_xticks(range(3), RESULT_LABELS)
     ax.set_yticks(range(3), RESULT_LABELS)
-    ax.set_xlabel("Predicted")
-    ax.set_ylabel("Actual")
+    ax.set_xlabel("Prediccion")
+    ax.set_ylabel("Real")
+    threshold = matrix.max() * 0.45
     for y in range(3):
         for x in range(3):
-            ax.text(x, y, str(matrix[y, x]), ha="center", va="center", color="#202124")
+            color = "white" if matrix[y, x] > threshold else "#111827"
+            ax.text(
+                x,
+                y,
+                str(matrix[y, x]),
+                ha="center",
+                va="center",
+                color=color,
+                fontsize=12,
+                fontweight="bold",
+            )
     fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
     fig.savefig(asset_dir / f"confusion_{result.name}.png")
     plt.close(fig)
@@ -360,14 +417,27 @@ def _plot_importance(result: EvaluationResult, asset_dir: Path) -> None:
     values = [row["importance"] for row in rows][::-1]
     fig, ax = plt.subplots(figsize=(8, 5.5))
     ax.barh(features, values, color="#4f7cac")
-    ax.set_title(f"Result-model feature importance: {result.title}")
-    ax.set_xlabel("Mean split importance")
+    ax.set_title(f"Importancia de features: {result.title}")
+    ax.set_xlabel("Importancia media por splits")
     ax.grid(axis="x", alpha=0.22)
     fig.savefig(asset_dir / f"feature_importance_{result.name}.png")
     plt.close(fig)
 
 
 def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Path) -> None:
+    feature_descriptions = {
+        "competition_family": "Familia de competicion: Mundial, eliminatoria, torneo continental, Nations League u otra categoria nacional.",
+        "stage_or_round": "Fase o ronda del partido. Da contexto competitivo: grupo, knockout, jornada, final, etc.",
+        "rating_threat_edge": "Ventaja combinada de fuerza/ranking y amenaza ofensiva esperada entre Equipo A y Equipo B.",
+        "quality_form_edge": "Forma reciente ajustada por calidad del rival, no solo puntos crudos.",
+        "goal_balance_edge": "Diferencia de balance goleador reciente e historico: goles a favor menos goles recibidos.",
+        "draw_pressure_index": "Indice de paridad y baja separacion esperada; ayuda a calibrar partidos cerrados.",
+        "score_control_value_edge": "Ventaja en control de marcador: capacidad reciente de sostener o transformar estados de partido.",
+        "rating_guardrail_edge": "Correccion de seguridad cuando las senales de amenaza se alejan demasiado del rating base.",
+        "rating_drift_abs": "Magnitud del cambio reciente entre rating historico y rating vivo; captura incertidumbre/volatilidad.",
+        "match_script_compatibility_edge": "Compatibilidad tactica estimada entre estilos de partido de ambos equipos.",
+        "clinical_low_block_matchup_edge": "Cruce entre definicion ofensiva y capacidad/riesgo contra bloques bajos.",
+    }
     draw_notes = []
     for result in results:
         matrix = np.asarray(result.confusion)
@@ -376,14 +446,14 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         draw_notes.append((result.title, actual_draws, predicted_draws))
 
     lines = [
-        "# Model evaluation",
+        "# Evaluacion del modelo",
         "",
-        "This report evaluates the current neutral parsimonious recipe with temporal "
-        "guards designed to avoid training on future information.",
+        "Este reporte evalua la receta neutral parsimoniosa actual con cortes "
+        "temporales disenados para evitar entrenamiento con informacion futura.",
         "",
-        f"Feature recipe: `{NEUTRAL_MODEL_RECIPE}`",
+        f"Receta de features: `{NEUTRAL_MODEL_RECIPE}`",
         "",
-        "## Test policies",
+        "## Politicas de test",
         "",
     ]
     for result in results:
@@ -393,18 +463,18 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
                 "",
                 result.policy,
                 "",
-                f"- Train matches: {result.train_matches}",
-                f"- Test matches: {result.test_matches}",
-                f"- Test window: {result.test_start} to {result.test_end}",
+                f"- Partidos de entrenamiento: {result.train_matches}",
+                f"- Partidos de test: {result.test_matches}",
+                f"- Ventana de test: {result.test_start} a {result.test_end}",
                 "",
             ]
         )
 
     lines.extend(
         [
-            "## Metrics",
+            "## Metricas",
             "",
-            "| Evaluation | Accuracy | Correct | Log loss | MAE team A | MAE team B | MAE avg |",
+            "| Evaluacion | Accuracy | Correctos | Log loss | MAE equipo A | MAE equipo B | MAE prom. |",
             "|---|---:|---:|---:|---:|---:|---:|",
         ]
     )
@@ -419,16 +489,16 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
     lines.extend(
         [
             "",
-            "![Metrics summary](assets/model_evaluation/metrics_summary.png)",
+            "![Resumen de metricas](assets/model_evaluation/metrics_summary.png)",
             "",
-            "## Technical interpretation",
+            "## Interpretacion tecnica",
             "",
-            "The model is directionally useful on winners, but the current decision "
-            "threshold is conservative around draws. In these holdouts it assigns "
-            "draw probability for log-loss calibration, yet the top class rarely "
-            "becomes `draw`.",
+            "El modelo es util para direccionar ganadores, pero el umbral actual es "
+            "conservador con los empates. En estos holdouts asigna probabilidad al "
+            "empate para calibracion via log loss, pero la clase con mayor probabilidad "
+            "casi nunca termina siendo `empate`.",
             "",
-            "| Evaluation | Actual draws | Predicted draws as top class |",
+            "| Evaluacion | Empates reales | Empates predichos como clase principal |",
             "|---|---:|---:|",
         ]
     )
@@ -437,13 +507,12 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
     lines.extend(
         [
             "",
-            "This is why log loss is shown next to accuracy: accuracy alone hides "
-            "whether the model is placing useful probability mass on draws and "
-            "close matches. The MAE values are reported separately because the goal "
-            "regressors can be directionally acceptable even when the 1X2 classifier "
-            "chooses the wrong class.",
+            "Por eso se muestra log loss junto a accuracy: accuracy sola oculta si "
+            "el modelo esta asignando probabilidad util a empates y partidos cerrados. "
+            "El MAE se reporta aparte porque los regresores de goles pueden estar "
+            "razonablemente calibrados aunque el clasificador 1X2 elija otra clase.",
             "",
-            "## Confusion matrices",
+            "## Matrices de confusion",
             "",
         ]
     )
@@ -452,21 +521,21 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
             [
                 f"### {result.title}",
                 "",
-                f"![Confusion matrix](assets/model_evaluation/confusion_{result.name}.png)",
+                f"![Matriz de confusion](assets/model_evaluation/confusion_{result.name}.png)",
                 "",
             ]
         )
 
-    lines.extend(["## Feature importance", ""])
+    lines.extend(["## Importancia de features", ""])
     for result in results:
         top = result.feature_importances["result_classifier"][:8]
         lines.extend(
             [
                 f"### {result.title}",
                 "",
-                f"![Feature importance](assets/model_evaluation/feature_importance_{result.name}.png)",
+                f"![Importancia de features](assets/model_evaluation/feature_importance_{result.name}.png)",
                 "",
-                "| Feature | Importance |",
+                "| Feature | Importancia |",
                 "|---|---:|",
             ]
         )
@@ -476,35 +545,70 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
 
     lines.extend(
         [
-            "## Feature construction summary",
+            "## Analisis de error",
             "",
-            "The active model uses only pre-match features. The 12 production features are:",
+            "Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. "
+            "Sirven para ver donde el modelo sufre mas, no como ranking definitivo: "
+            "algunos grupos tienen pocas observaciones.",
             "",
         ]
     )
+    for result in results:
+        lines.extend([f"### {result.title}", ""])
+        for key, title in [
+            ("by_competition", "Por competicion"),
+            ("by_stage", "Por fase/ronda"),
+            ("by_result", "Por resultado real"),
+        ]:
+            lines.extend(
+                [
+                    f"#### {title}",
+                    "",
+                    "| Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |",
+                    "|---|---:|---:|---:|---:|---:|---:|",
+                ]
+            )
+            for row in result.error_analysis[key][:8]:
+                log_loss_value = "n/a" if row["log_loss"] is None else f"{float(row['log_loss']):.4f}"
+                lines.append(
+                    f"| {row['group']} | {row['matches']} | {row['accuracy']:.4f} | "
+                    f"{log_loss_value} | {row['mae_team_a_goals']:.4f} | "
+                    f"{row['mae_team_b_goals']:.4f} | {row['mae_goals_avg']:.4f} |"
+                )
+            lines.append("")
+
+    lines.extend(
+        [
+            "## Construccion de features",
+            "",
+            f"El modelo activo usa {len(NEUTRAL_FEATURES)} features prepartido:",
+            "",
+            "| Feature | Significado |",
+            "|---|---|",
+        ]
+    )
     for feature in NEUTRAL_FEATURES:
-        lines.append(f"- `{feature}`")
+        lines.append(f"| `{feature}` | {feature_descriptions.get(feature, '')} |")
     lines.extend(
         [
             "",
-            "High-level groups:",
+            "Grupos conceptuales:",
             "",
-            "- Rating strength: FIFA/ranking, Elo-style team strength, rating guardrail and drift.",
-            "- Recent form: opponent-adjusted recent points and goal-balance signals.",
-            "- Match context: competition family, stage/round and draw-pressure context.",
-            "- Tactical/attacking profile: match-script compatibility, clinical low-block matchup and club star-finisher signal.",
+            "- Fuerza/rating: ranking FIFA, fuerza tipo Elo, guardrails y drift.",
+            "- Forma reciente: puntos ajustados por rival y balance de goles.",
+            "- Contexto del partido: tipo de competicion, fase/ronda y presion de empate.",
+            "- Perfil tactico/ofensivo: compatibilidad de guion de partido y matchup contra bloque bajo.",
             "",
-            "Excluded from model features: target goals/results, raw identifiers, raw dates, source names and post-match statistics from the evaluated match.",
+            "Quedan fuera de los features: goles objetivo, resultado final, ids crudos, fecha cruda, equipos, fuente y estadisticas postpartido del encuentro evaluado.",
             "",
-            "## Leakage controls",
+            "## Controles anti-leakage",
             "",
-            "The World Cup holdout is the primary model accuracy because it matches the target domain. "
-            "The external random temporal holdout is a robustness diagnostic: it samples non-World-Cup-2026 "
-            "official national-team matches but still trains only on matches before the first selected test date.",
+            "El holdout Mundial 2026 es la metrica principal porque coincide con el dominio objetivo. "
+            "El holdout externo random temporal es diagnostico de robustez: toma partidos oficiales "
+            "nacionales fuera del Mundial 2026, pero entrena solo con partidos anteriores al primer test seleccionado.",
             "",
-            "Both evaluations rebuild features before fitting and keep the following columns out of the model: "
-            "`match_id`, `source`, raw `date`, teams, goals, final result and provider identifiers. "
-            "Date is used only to define chronological splits and pre-match rolling context.",
+            "Ambas evaluaciones reconstruyen features antes de entrenar. La fecha se usa para cortes cronologicos "
+            "y contexto rolling prepartido; no entra como feature directa.",
             "",
         ]
     )
@@ -532,16 +636,21 @@ def main() -> None:
     results = [
         _evaluate(
             "worldcup_2026",
-            "World Cup 2026 holdout",
-            wc_info["policy"],
+            "Holdout Mundial 2026",
+            wc_info["policy"]
+            .replace("Played World Cup 2026 matches are forced to test.", "Los partidos jugados del Mundial 2026 se fuerzan como test.")
+            .replace("Training uses only national-team matches before the first World Cup 2026 match; same-date and later rows are excluded.", "El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; filas de la misma fecha o posteriores se excluyen."),
             args.data_root,
             training,
             wc_clean,
         ),
         _evaluate(
             "external_random_temporal",
-            "External random temporal holdout",
-            external_info["policy"],
+            "Holdout externo random temporal",
+            external_info["policy"]
+            .replace("Random holdout of", "Holdout random de")
+            .replace("non-friendly, non-World-Cup-2026 national matches from the recent official-match pool", "partidos nacionales no amistosos y fuera del Mundial 2026, tomados del pool reciente de partidos oficiales")
+            .replace("Training uses only matches before the earliest selected test date; same-date and later non-selected rows are excluded.", "El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test; filas no seleccionadas de la misma fecha o posteriores se excluyen."),
             args.data_root,
             training,
             external_clean,
