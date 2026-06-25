@@ -32,4 +32,5 @@ scripts/*
 !scripts/run_worldcup2026_top4_simulation.py
 !scripts/update_worldcup2026_manual_detail_from_espn.py
 !scripts/update_worldcup2026_manual_detail_from_thescore.py
+!scripts/generate_model_evaluation_report.py
 !scripts/worldcup2026_default_auc_evaluation.py

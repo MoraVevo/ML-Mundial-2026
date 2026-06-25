@@ -1,36 +1,74 @@
-from pathlib import Path
-
 import pandas as pd
 
+import scripts.generate_model_evaluation_report as report
 import scripts.predict_next4_with_all_played_worldcup as all_played
 import scripts.worldcup2026_default_auc_evaluation as auc_evaluation
-import scripts.worldcup2026_signal_pruning_evaluation as signal_pruning
 
 
-def test_default_evaluation_frames_are_national_only(monkeypatch, tmp_path) -> None:
-    calls = []
-
-    def export_training_frame(data_root: Path, **kwargs):
-        calls.append(("training", data_root, kwargs))
-        return [{"match_id": "m1"}]
-
-    def export_clean_training_matrix(data_root: Path, **kwargs):
-        calls.append(("clean", data_root, kwargs))
-        return [{"split": "train"}]
-
-    monkeypatch.setattr(signal_pruning.base_model, "export_training_frame", export_training_frame)
-    monkeypatch.setattr(
-        signal_pruning.base_model,
-        "export_clean_training_matrix",
-        export_clean_training_matrix,
+def test_worldcup_split_uses_only_prior_training_rows() -> None:
+    training = pd.DataFrame(
+        [
+            {
+                "date": "2026-06-01",
+                "source": "provider",
+                "competition_name": "Friendly",
+                "is_friendly": True,
+            },
+            {
+                "date": "2026-06-10",
+                "source": "provider",
+                "competition_name": "World Cup - Qualification Europe",
+                "is_friendly": False,
+            },
+            {
+                "date": "2026-06-11",
+                "source": "manual-worldcup-2026",
+                "competition_name": "FIFA World Cup",
+                "is_friendly": False,
+            },
+            {
+                "date": "2026-06-12",
+                "source": "provider",
+                "competition_name": "World Cup - Qualification Europe",
+                "is_friendly": False,
+            },
+        ]
     )
+    clean = pd.DataFrame({"split": ["train", "train", "train", "train"]})
 
-    training, clean = signal_pruning._default_evaluation_frames(tmp_path)
+    split, info = report._split_worldcup_2026(training, clean)
 
-    assert len(training) == 1
-    assert len(clean) == 1
-    assert [name for name, _, _ in calls] == ["training", "clean"]
-    assert all(kwargs["national_only"] is True for _, _, kwargs in calls)
+    assert split["split"].tolist() == ["train", "train", "test", "excluded"]
+    assert "before the first World Cup 2026 match" in info["policy"]
+
+
+def test_external_random_split_excludes_same_and_later_nonselected_rows() -> None:
+    rows = []
+    for index in range(12):
+        rows.append(
+            {
+                "row_index": index,
+                "date": f"2025-01-{index + 1:02d}",
+                "source": "provider",
+                "competition_name": "UEFA Nations League",
+                "is_friendly": False,
+            }
+        )
+    training = pd.DataFrame(rows)
+    clean = pd.DataFrame({"split": ["train"] * len(training)})
+
+    split, _ = report._split_external_random_temporal(
+        training,
+        clean,
+        test_matches=4,
+        seed=7,
+    )
+    test_dates = pd.to_datetime(training.loc[split["split"].eq("test"), "date"])
+    cutoff = test_dates.min()
+    later_non_test = pd.to_datetime(training["date"]).ge(cutoff) & ~split["split"].eq("test")
+
+    assert set(split["split"].unique()) == {"train", "test", "excluded"}
+    assert split.loc[later_non_test, "split"].eq("excluded").all()
 
 
 def test_latest_manual_result_date_uses_manual_file(tmp_path) -> None:

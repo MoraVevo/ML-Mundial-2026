@@ -10,26 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import lightgbm as lgb
-import numpy as np
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
-
-from kinela.lightgbm_model import CATEGORICAL_FEATURES, NEUTRAL_FEATURES
-from worldcup2026_signal_pruning_evaluation import _prepare
-
-
-CLF_PARAMS = {
-    "objective": "multiclass",
-    "n_estimators": 300,
-    "learning_rate": 0.035,
-    "num_leaves": 23,
-    "min_child_samples": 35,
-    "subsample": 0.85,
-    "colsample_bytree": 0.85,
-    "random_state": 42,
-    "verbosity": -1,
-}
+from generate_model_evaluation_report import (  # noqa: E402
+    _evaluate,
+    _load_frames,
+    _split_worldcup_2026,
+)
 
 
 def _latest_manual_result_date(data_root: Path) -> str:
@@ -37,90 +22,42 @@ def _latest_manual_result_date(data_root: Path) -> str:
     if not path.exists():
         return date.today().isoformat()
     with path.open(encoding="utf-8") as handle:
-        dates = [
-            row["date"]
-            for row in csv.DictReader(handle)
-            if row.get("date")
-        ]
+        dates = [row["date"] for row in csv.DictReader(handle) if row.get("date")]
     return max(dates, default=date.today().isoformat())
 
 
 def main() -> None:
     data_root = Path("data")
+    training, clean = _load_frames(data_root)
+    split_clean, split_info = _split_worldcup_2026(training, clean)
+    result = _evaluate(
+        "worldcup_2026",
+        "World Cup 2026 holdout",
+        split_info["policy"],
+        data_root,
+        training,
+        split_clean,
+    )
+    payload = {
+        "accuracy_policy": result.policy,
+        "model": "lightgbm_neutral_parsimonious",
+        "test_matches": result.test_matches,
+        "test_start": result.test_start,
+        "test_end": result.test_end,
+        "class_counts": result.result_distribution,
+        "accuracy": result.metrics["accuracy"],
+        "correct": result.metrics["correct"],
+        "log_loss": result.metrics["log_loss"],
+        "mae_team_a_goals": result.metrics["mae_team_a_goals"],
+        "mae_team_b_goals": result.metrics["mae_team_b_goals"],
+        "mae_goals_avg": result.metrics["mae_goals_avg"],
+        "confusion": result.confusion,
+    }
     output = Path(
         f"outputs/worldcup2026_default_auc_evaluation_{_latest_manual_result_date(data_root)}.json"
     )
-    neutral = _prepare()
-    train = neutral[neutral["split"].eq("train")].copy()
-    test = neutral[neutral["split"].eq("test")].copy()
-    features = list(NEUTRAL_FEATURES)
-    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in features]
-    weights = train["match_recency_weight"].astype(float).to_numpy(copy=True)
-
-    calibrated = CalibratedClassifierCV(
-        lgb.LGBMClassifier(**CLF_PARAMS),
-        method="sigmoid",
-        cv=3,
-    )
-    calibrated.fit(
-        train[features],
-        train["result_label"],
-        sample_weight=weights,
-        categorical_feature=categorical,
-    )
-    probabilities = calibrated.predict_proba(test[features])
-    labels = test["result_label"].astype(int).to_numpy()
-    one_hot = np.eye(3)[labels]
-    class_names = ["team_a", "draw", "team_b"]
-    class_auc = {
-        class_names[index]: round(
-            float(roc_auc_score(one_hot[:, index], probabilities[:, index])),
-            4,
-        )
-        for index in range(3)
-    }
-    payload = {
-        "accuracy_policy": (
-            f"All {len(test)} played World Cup 2026 matches are forced to test "
-            "and excluded from training."
-        ),
-        "model": "lightgbm_neutral_current_default",
-        "features": features,
-        "test_matches": int(len(test)),
-        "class_counts": {
-            class_names[index]: int((labels == index).sum())
-            for index in range(3)
-        },
-        "accuracy": round(
-            float(accuracy_score(labels, probabilities.argmax(axis=1))),
-            4,
-        ),
-        "correct": int((labels == probabilities.argmax(axis=1)).sum()),
-        "log_loss": round(
-            float(log_loss(labels, probabilities, labels=[0, 1, 2])),
-            4,
-        ),
-        "auc_macro_ovr": round(
-            float(roc_auc_score(labels, probabilities, multi_class="ovr", average="macro")),
-            4,
-        ),
-        "auc_weighted_ovr": round(
-            float(
-                roc_auc_score(
-                    labels,
-                    probabilities,
-                    multi_class="ovr",
-                    average="weighted",
-                )
-            ),
-            4,
-        ),
-        "auc_by_class": class_auc,
-    }
-    output.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
