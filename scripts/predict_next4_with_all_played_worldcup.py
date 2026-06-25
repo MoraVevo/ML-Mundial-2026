@@ -164,7 +164,7 @@ def _train_model(data_root: Path) -> tuple[dict, dict[str, int]]:
         "team_b_goals_model": team_b_model,
         "result_model": result_model,
         "features": features,
-        "feature_recipe": f"{NEUTRAL_MODEL_RECIPE}_all_played_wc2026",
+        "model_id": f"{NEUTRAL_MODEL_RECIPE}_all_played_wc2026",
         "sklearn_version": sklearn.__version__,
         "lightgbm_version": lgb.__version__,
         "training_policy": (
@@ -405,7 +405,7 @@ def main() -> None:
     coverage_path = Path("outputs/worldcup2026_manual_detail_coverage_audit.json")
     coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
     payload = {
-        "model": model["feature_recipe"],
+        "model": model.get("model_id", "lightgbm_neutral"),
         "features": model["features"],
         "training": training_counts,
         "worldcup_detail_coverage": {

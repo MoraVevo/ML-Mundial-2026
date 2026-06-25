@@ -3,11 +3,10 @@
 Pipeline reproducible para recolectar datos de futbol, construir variables
 prepartido y generar predicciones para el Mundial 2026.
 
-El repositorio contiene la linea principal del proyecto: modelo neutral
-parsimonioso, datos estaticos necesarios para el calendario/resultados manuales,
-scripts operativos y pruebas automatizadas. Los datos crudos, matrices
-generadas, modelos entrenados, salidas de prediccion y experimentos de variantes
-se mantienen fuera de Git.
+El repositorio contiene el modelo neutral del proyecto, datos estaticos
+necesarios para el calendario/resultados manuales, scripts operativos y pruebas
+automatizadas. Los datos crudos, matrices generadas, modelos entrenados y
+salidas de prediccion se mantienen fuera de Git.
 
 ## Fuentes
 
@@ -71,15 +70,15 @@ analisis de error e importancia de features esta en
 
 ## Modelo
 
-El modelo de produccion es neutral y usa variables prepartido. La receta actual
-se centra en senales parsimoniosas de ranking, forma reciente, balance de goles,
-contexto de fase, compatibilidad tactica y calidad ofensiva disponible.
+El modelo de produccion es neutral y usa variables prepartido de ranking, forma
+reciente, balance de goles, contexto de fase y compatibilidad tactica.
 
 La evaluacion principal reporta accuracy sobre partidos ya jugados del Mundial
-2026, forzandolos como conjunto de prueba y excluyendolos del entrenamiento. Para
-predicciones futuras, el script `predict_next4_with_all_played_worldcup.py`
-entrena con todos los partidos nacionales completados disponibles, incluyendo los
-resultados ya jugados del Mundial.
+2026. Esos partidos se separan como test y no se usan para entrenar el modelo
+que calcula ese accuracy. Para predicciones futuras, el script
+`predict_next4_with_all_played_worldcup.py` entrena con todos los partidos
+nacionales completados disponibles, incluyendo los resultados ya jugados del
+Mundial.
 
 ## Estructura
 
@@ -101,7 +100,6 @@ final. Por defecto no versiona:
 - matrices procesadas
 - modelos entrenados
 - predicciones, reportes y hojas generadas
-- scripts exploratorios de variantes
 
 ## GitHub Actions
 

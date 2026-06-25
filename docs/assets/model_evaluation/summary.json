@@ -1,6 +1,6 @@
 {
-  "model": "lightgbm_neutral_parsimonious",
-  "feature_recipe": "parsimonious_live_fifa_drift_abs_match_script_bilateral_clinical_low_block_w12_guardrail_residual_friendly_weight_060",
+  "model": "lightgbm_neutral",
+  "model_id": "neutral_worldcup_v1",
   "features": [
     "competition_family",
     "stage_or_round",
@@ -17,8 +17,8 @@
   "evaluations": [
     {
       "name": "worldcup_2026",
-      "title": "Holdout Mundial 2026",
-      "policy": "Los partidos jugados del Mundial 2026 se fuerzan como test. El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; filas de la misma fecha o posteriores se excluyen.",
+      "title": "Test Mundial 2026",
+      "policy": "Los partidos jugados del Mundial 2026 se fuerzan como test. El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; esos partidos de test no se usan para entrenar.",
       "train_matches": 787,
       "test_matches": 54,
       "test_start": "2026-06-11",
@@ -252,8 +252,8 @@
     },
     {
       "name": "external_random_temporal",
-      "title": "Holdout externo random temporal",
-      "policy": "Holdout random de 104 partidos nacionales no amistosos y fuera del Mundial 2026, tomados del pool reciente de partidos oficiales, seed=42. El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test; filas no seleccionadas de la misma fecha o posteriores se excluyen.",
+      "title": "Test externo temporal",
+      "policy": "Test aleatorio de 104 partidos nacionales no amistosos y fuera del Mundial 2026, tomados del pool reciente de partidos oficiales, seed=42. El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test; los partidos seleccionados como test no se usan para entrenar.",
       "train_matches": 565,
       "test_matches": 104,
       "test_start": "2024-09-07",

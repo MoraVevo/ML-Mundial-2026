@@ -1,22 +1,22 @@
 # Evaluacion del modelo
 
-Este reporte evalua la receta neutral parsimoniosa actual con cortes temporales disenados para evitar entrenamiento con informacion futura.
+Este reporte evalua el modelo neutral con cortes temporales disenados para que los partidos de test no entren al entrenamiento.
 
-Receta de features: `parsimonious_live_fifa_drift_abs_match_script_bilateral_clinical_low_block_w12_guardrail_residual_friendly_weight_060`
+Identificador del modelo: `neutral_worldcup_v1`
 
 ## Politicas de test
 
-### Holdout Mundial 2026
+### Test Mundial 2026
 
-Los partidos jugados del Mundial 2026 se fuerzan como test. El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; filas de la misma fecha o posteriores se excluyen.
+Los partidos jugados del Mundial 2026 se fuerzan como test. El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; esos partidos de test no se usan para entrenar.
 
 - Partidos de entrenamiento: 787
 - Partidos de test: 54
 - Ventana de test: 2026-06-11 a 2026-06-25
 
-### Holdout externo random temporal
+### Test externo temporal
 
-Holdout random de 104 partidos nacionales no amistosos y fuera del Mundial 2026, tomados del pool reciente de partidos oficiales, seed=42. El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test; filas no seleccionadas de la misma fecha o posteriores se excluyen.
+Test aleatorio de 104 partidos nacionales no amistosos y fuera del Mundial 2026, tomados del pool reciente de partidos oficiales, seed=42. El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test; los partidos seleccionados como test no se usan para entrenar.
 
 - Partidos de entrenamiento: 565
 - Partidos de test: 104
@@ -26,35 +26,35 @@ Holdout random de 104 partidos nacionales no amistosos y fuera del Mundial 2026,
 
 | Evaluacion | Accuracy | Correctos | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Holdout Mundial 2026 | 0.5370 | 29/54 | 0.9762 | 1.1763 | 0.8515 | 1.0139 |
-| Holdout externo random temporal | 0.6635 | 69/104 | 0.8949 | 0.9929 | 1.0552 | 1.0240 |
+| Test Mundial 2026 | 0.5370 | 29/54 | 0.9762 | 1.1763 | 0.8515 | 1.0139 |
+| Test externo temporal | 0.6635 | 69/104 | 0.8949 | 0.9929 | 1.0552 | 1.0240 |
 
 ![Resumen de metricas](assets/model_evaluation/metrics_summary.png)
 
 ## Interpretacion tecnica
 
-El modelo es util para direccionar ganadores, pero el umbral actual es conservador con los empates. En estos holdouts asigna probabilidad al empate para calibracion via log loss, pero la clase con mayor probabilidad casi nunca termina siendo `empate`.
+El modelo es util para direccionar ganadores, pero el umbral actual es conservador con los empates. En estos tests asigna probabilidad al empate para calibracion via log loss, pero la clase con mayor probabilidad casi nunca termina siendo `empate`.
 
 | Evaluacion | Empates reales | Empates predichos como clase principal |
 |---|---:|---:|
-| Holdout Mundial 2026 | 14 | 0 |
-| Holdout externo random temporal | 22 | 0 |
+| Test Mundial 2026 | 14 | 0 |
+| Test externo temporal | 22 | 0 |
 
 Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo esta asignando probabilidad util a empates y partidos cerrados. El MAE se reporta aparte porque los regresores de goles pueden estar razonablemente calibrados aunque el clasificador 1X2 elija otra clase.
 
 ## Matrices de confusion
 
-### Holdout Mundial 2026
+### Test Mundial 2026
 
 ![Matriz de confusion](assets/model_evaluation/confusion_worldcup_2026.png)
 
-### Holdout externo random temporal
+### Test externo temporal
 
 ![Matriz de confusion](assets/model_evaluation/confusion_external_random_temporal.png)
 
 ## Importancia de features
 
-### Holdout Mundial 2026
+### Test Mundial 2026
 
 ![Importancia de features](assets/model_evaluation/feature_importance_worldcup_2026.png)
 
@@ -69,7 +69,7 @@ Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo 
 | `match_script_compatibility_edge` | 2018.00 |
 | `rating_threat_edge` | 1825.00 |
 
-### Holdout externo random temporal
+### Test externo temporal
 
 ![Importancia de features](assets/model_evaluation/feature_importance_external_random_temporal.png)
 
@@ -88,7 +88,7 @@ Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo 
 
 Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven para ver donde el modelo sufre mas, no como ranking definitivo: algunos grupos tienen pocas observaciones.
 
-### Holdout Mundial 2026
+### Test Mundial 2026
 
 #### Por competicion
 
@@ -110,7 +110,7 @@ Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven
 | Equipo B | 11 | 0.9091 | n/a | 0.7719 | 1.3160 | 1.0439 |
 | Empate | 14 | 0.0000 | n/a | 1.0565 | 0.5947 | 0.8256 |
 
-### Holdout externo random temporal
+### Test externo temporal
 
 #### Por competicion
 
@@ -173,6 +173,8 @@ Quedan fuera de los features: goles objetivo, resultado final, ids crudos, fecha
 
 ## Controles anti-leakage
 
-El holdout Mundial 2026 es la metrica principal porque coincide con el dominio objetivo. El holdout externo random temporal es diagnostico de robustez: toma partidos oficiales nacionales fuera del Mundial 2026, pero entrena solo con partidos anteriores al primer test seleccionado.
+El test Mundial 2026 es la metrica principal porque evalua el mismo tipo de partido que se quiere predecir. Esos partidos no se usan para entrenar: se separan como test y el modelo se ajusta solo con partidos anteriores al inicio del Mundial 2026.
+
+El test externo temporal revisa si el modelo tambien se sostiene fuera del Mundial. Selecciona partidos oficiales nacionales fuera del Mundial 2026 y entrena solo con partidos anteriores al primer partido seleccionado como test. En otras palabras: el accuracy de cada test se calcula sobre partidos que el modelo no vio durante entrenamiento.
 
 Ambas evaluaciones reconstruyen features antes de entrenar. La fecha se usa para cortes cronologicos y contexto rolling prepartido; no entra como feature directa.

@@ -101,11 +101,11 @@ def test_simulator_prefers_all_played_future_lightgbm_model(tmp_path) -> None:
     models_dir = tmp_path / "models"
     models_dir.mkdir()
     joblib.dump(
-        {"feature_recipe": "standard-heldout"},
+        {"model_id": "standard-heldout"},
         models_dir / "lightgbm_neutral_model.joblib",
     )
     joblib.dump(
-        {"feature_recipe": "all-played-future"},
+        {"model_id": "all-played-future"},
         models_dir / "lightgbm_neutral_all_played_wc2026.joblib",
     )
     simulator = WorldCup2026Simulator.__new__(WorldCup2026Simulator)
@@ -113,4 +113,4 @@ def test_simulator_prefers_all_played_future_lightgbm_model(tmp_path) -> None:
 
     model = simulator._load_lightgbm_model()
 
-    assert model["feature_recipe"] == "all-played-future"
+    assert model["model_id"] == "all-played-future"

@@ -302,9 +302,7 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "match_script_compatibility_edge",
     "clinical_low_block_matchup_edge",
 ]
-NEUTRAL_MODEL_RECIPE = (
-    "parsimonious_live_fifa_drift_abs_match_script_bilateral_clinical_low_block_w12_guardrail_residual_friendly_weight_060"
-)
+NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v1"
 NEUTRAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
 NEUTRAL_CANDIDATE_FEATURES = [
     "late85_points_swing_edge",
@@ -2358,7 +2356,7 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
 
     metrics = {
         "model": "lightgbm_neutral",
-        "feature_recipe": NEUTRAL_MODEL_RECIPE,
+        "model_id": NEUTRAL_MODEL_RECIPE,
         "matches": int(len(frame)),
         "train_rows_after_augmentation": int(len(train)),
         "test_matches": int(len(test)),
@@ -2380,7 +2378,7 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
             "team_b_goals_model": team_b_model,
             "result_model": calibrated,
             "features": NEUTRAL_FEATURES,
-            "feature_recipe": NEUTRAL_MODEL_RECIPE,
+            "model_id": NEUTRAL_MODEL_RECIPE,
             "sklearn_version": sklearn.__version__,
             "lightgbm_version": lgb.__version__,
         },

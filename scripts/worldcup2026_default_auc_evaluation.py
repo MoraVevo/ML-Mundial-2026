@@ -40,7 +40,7 @@ def main() -> None:
     )
     payload = {
         "accuracy_policy": result.policy,
-        "model": "lightgbm_neutral_parsimonious",
+        "model": "lightgbm_neutral",
         "test_matches": result.test_matches,
         "test_start": result.test_start,
         "test_end": result.test_end,

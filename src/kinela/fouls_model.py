@@ -274,7 +274,7 @@ def train_lightgbm_neutral_fouls(data_root: Path) -> dict[str, Any]:
         "training_rows_after_augmentation": int(len(train)),
         "test_matches": int(len(test)),
         "features": len(FOULS_FEATURES),
-        "feature_budget_rule": "parsimonious: 13 pre-one-hot features for 181 unique train matches",
+        "feature_budget_rule": "13 pre-one-hot features for 181 unique train matches",
         "target_coverage_rows": int(len(frame)),
     }
     for target, model in models.items():
@@ -380,7 +380,7 @@ def train_poisson_neutral_fouls(data_root: Path) -> dict[str, Any]:
         "training_rows_after_augmentation": int(len(train)),
         "test_matches": int(len(test)),
         "features": len(PARSIMONIOUS_FOULS_FEATURES),
-        "feature_budget_rule": "parsimonious: 13 pre-one-hot features for 181 unique train matches",
+        "feature_budget_rule": "13 pre-one-hot features for 181 unique train matches",
         "target_coverage_rows": int(len(frame)),
     }
     for target, model in models.items():

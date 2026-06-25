@@ -10,13 +10,13 @@ from kinela.model import (
 )
 
 
-def test_normalise_stage_or_round_group_stage_variants() -> None:
+def test_normalise_stage_or_round_group_stage_labels() -> None:
     assert _normalise_stage_or_round("Group Stage") == "GROUP_STAGE"
     assert _normalise_stage_or_round("GROUP_STAGE") == "GROUP_STAGE"
     assert _normalise_stage_or_round("Group E - 2") == "GROUP_STAGE"
 
 
-def test_normalise_stage_or_round_knockout_variants() -> None:
+def test_normalise_stage_or_round_knockout_labels() -> None:
     assert _normalise_stage_or_round("Round of 16") == "LAST_16"
     assert _normalise_stage_or_round("Quarter-finals") == "QUARTER_FINALS"
     assert _normalise_stage_or_round("Semi-finals") == "SEMI_FINALS"

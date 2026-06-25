@@ -174,10 +174,11 @@ def _split_external_random_temporal(
         "test_start": str(selected["_date"].min().date()),
         "test_end": str(selected["_date"].max().date()),
         "policy": (
-            f"Random holdout of {test_matches} non-friendly, non-World-Cup-2026 "
-            f"national matches from the recent official-match pool, seed={seed}. "
-            "Training uses only matches before the earliest selected test date; "
-            "same-date and later non-selected rows are excluded."
+            f"Test aleatorio de {test_matches} partidos nacionales no amistosos "
+            "y fuera del Mundial 2026, tomados del pool reciente de partidos "
+            f"oficiales, seed={seed}. El entrenamiento usa solo partidos "
+            "anteriores a la primera fecha seleccionada de test; los partidos "
+            "seleccionados como test no se usan para entrenar."
         ),
     }
 
@@ -448,10 +449,10 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
     lines = [
         "# Evaluacion del modelo",
         "",
-        "Este reporte evalua la receta neutral parsimoniosa actual con cortes "
-        "temporales disenados para evitar entrenamiento con informacion futura.",
+        "Este reporte evalua el modelo neutral con cortes temporales disenados "
+        "para que los partidos de test no entren al entrenamiento.",
         "",
-        f"Receta de features: `{NEUTRAL_MODEL_RECIPE}`",
+        f"Identificador del modelo: `{NEUTRAL_MODEL_RECIPE}`",
         "",
         "## Politicas de test",
         "",
@@ -494,7 +495,7 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
             "## Interpretacion tecnica",
             "",
             "El modelo es util para direccionar ganadores, pero el umbral actual es "
-            "conservador con los empates. En estos holdouts asigna probabilidad al "
+            "conservador con los empates. En estos tests asigna probabilidad al "
             "empate para calibracion via log loss, pero la clase con mayor probabilidad "
             "casi nunca termina siendo `empate`.",
             "",
@@ -603,12 +604,17 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
             "",
             "## Controles anti-leakage",
             "",
-            "El holdout Mundial 2026 es la metrica principal porque coincide con el dominio objetivo. "
-            "El holdout externo random temporal es diagnostico de robustez: toma partidos oficiales "
-            "nacionales fuera del Mundial 2026, pero entrena solo con partidos anteriores al primer test seleccionado.",
+            "El test Mundial 2026 es la metrica principal porque evalua el mismo tipo de partido "
+            "que se quiere predecir. Esos partidos no se usan para entrenar: se separan como test "
+            "y el modelo se ajusta solo con partidos anteriores al inicio del Mundial 2026.",
             "",
-            "Ambas evaluaciones reconstruyen features antes de entrenar. La fecha se usa para cortes cronologicos "
-            "y contexto rolling prepartido; no entra como feature directa.",
+            "El test externo temporal revisa si el modelo tambien se sostiene fuera del Mundial. "
+            "Selecciona partidos oficiales nacionales fuera del Mundial 2026 y entrena solo con partidos "
+            "anteriores al primer partido seleccionado como test. En otras palabras: el accuracy de cada "
+            "test se calcula sobre partidos que el modelo no vio durante entrenamiento.",
+            "",
+            "Ambas evaluaciones reconstruyen features antes de entrenar. La fecha se usa para cortes "
+            "cronologicos y contexto rolling prepartido; no entra como feature directa.",
             "",
         ]
     )
@@ -636,21 +642,18 @@ def main() -> None:
     results = [
         _evaluate(
             "worldcup_2026",
-            "Holdout Mundial 2026",
+            "Test Mundial 2026",
             wc_info["policy"]
             .replace("Played World Cup 2026 matches are forced to test.", "Los partidos jugados del Mundial 2026 se fuerzan como test.")
-            .replace("Training uses only national-team matches before the first World Cup 2026 match; same-date and later rows are excluded.", "El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; filas de la misma fecha o posteriores se excluyen."),
+            .replace("Training uses only national-team matches before the first World Cup 2026 match; same-date and later rows are excluded.", "El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; esos partidos de test no se usan para entrenar."),
             args.data_root,
             training,
             wc_clean,
         ),
         _evaluate(
             "external_random_temporal",
-            "Holdout externo random temporal",
-            external_info["policy"]
-            .replace("Random holdout of", "Holdout random de")
-            .replace("non-friendly, non-World-Cup-2026 national matches from the recent official-match pool", "partidos nacionales no amistosos y fuera del Mundial 2026, tomados del pool reciente de partidos oficiales")
-            .replace("Training uses only matches before the earliest selected test date; same-date and later non-selected rows are excluded.", "El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test; filas no seleccionadas de la misma fecha o posteriores se excluyen."),
+            "Test externo temporal",
+            external_info["policy"],
             args.data_root,
             training,
             external_clean,
@@ -664,8 +667,8 @@ def main() -> None:
     _write_markdown(results, args.asset_dir, args.report)
 
     payload = {
-        "model": "lightgbm_neutral_parsimonious",
-        "feature_recipe": NEUTRAL_MODEL_RECIPE,
+        "model": "lightgbm_neutral",
+        "model_id": NEUTRAL_MODEL_RECIPE,
         "features": list(NEUTRAL_FEATURES),
         "evaluations": [result.__dict__ for result in results],
     }
