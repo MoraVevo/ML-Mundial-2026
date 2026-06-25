@@ -1,0 +1,67 @@
+{
+  "purpose": "Candidate aggregate tactical profiles for future testing after improving API-Football fixture-detail coverage.",
+  "status": {
+    "active_in_default_model": false,
+    "reason": "Current tactical detail coverage is about 45%, still below the 60% minimum target for activating profile features.",
+    "last_experiment_output": "outputs/tactical_profile_experiment.json",
+    "minimum_recommended_coverage_pct": 60.0
+  },
+  "download_plan": {
+    "missing_valid_fixture_details": 516,
+    "commands": [
+      ".\\.venv\\Scripts\\python.exe -m kinela.cli collect api-football-missing-details --detail-limit 516",
+      ".\\.venv\\Scripts\\python.exe -m kinela.cli normalize api-football",
+      ".\\.venv\\Scripts\\python.exe -m kinela.cli train lightgbm-neutral"
+    ]
+  },
+  "profiles": [
+    {
+      "name": "tactical_attacking_pressure_diff",
+      "label": "perfil_ofensivo",
+      "description": "Recent attacking pressure from shots on goal, box shots, total shots, and corners.",
+      "components": {
+        "recent6_shots_on_goal_diff": 1.0,
+        "recent6_shots_inside_box_diff": 0.35,
+        "recent6_total_shots_diff": 0.12,
+        "recent6_corner_kicks_diff": 0.25
+      }
+    },
+    {
+      "name": "tactical_buildup_control_diff",
+      "label": "perfil_construccion",
+      "description": "Recent buildup/control profile from possession and pass volume/accuracy.",
+      "components": {
+        "recent6_ball_possession_pct_diff": 0.1,
+        "recent6_passes_accurate_diff": 0.006,
+        "recent6_passes_pct_diff": 0.05
+      }
+    },
+    {
+      "name": "tactical_direct_play_diff",
+      "label": "perfil_directo_contraataque",
+      "description": "Recent direct/vertical play profile, rewarding shots and offsides while discounting possession/pass volume.",
+      "components": {
+        "recent6_total_shots_diff": 0.3,
+        "recent6_offsides_diff": 0.45,
+        "recent6_shots_outside_box_diff": 0.25,
+        "recent6_total_passes_diff": -0.0025,
+        "recent6_ball_possession_pct_diff": -0.025
+      }
+    },
+    {
+      "name": "tactical_defensive_stress_diff",
+      "label": "perfil_estres_defensivo_disciplina",
+      "description": "Recent defensive stress and discipline profile from goalkeeper saves, fouls, and yellow cards.",
+      "components": {
+        "recent6_goalkeeper_saves_diff": 0.8,
+        "recent6_fouls_diff": 0.2,
+        "recent6_yellow_cards_diff": 0.65
+      }
+    }
+  ],
+  "future_candidates": [
+    "tactical_set_piece_pressure_diff",
+    "tactical_finishing_profile_diff",
+    "tactical_allowed_pressure_diff"
+  ]
+}

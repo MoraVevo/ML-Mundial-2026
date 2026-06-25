@@ -1,0 +1,2 @@
+"""External football data providers."""
+

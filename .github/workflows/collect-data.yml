@@ -1,0 +1,87 @@
+name: Collect football data
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_football_team_id:
+        description: "Optional API-Football team id"
+        required: false
+        type: string
+      football_data_team_id:
+        description: "Optional football-data.org team id"
+        required: false
+        type: string
+      collect_world_cup_teams:
+        description: "Collect recent matches for all 2022 World Cup teams"
+        required: false
+        default: false
+        type: boolean
+      collect_current_world_cup_teams:
+        description: "Collect current World Cup teams through football-data.org"
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: "17 5 * * 1"
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      APISPORTS_KEY: ${{ secrets.APISPORTS_KEY }}
+      FOOTBALL_DATA_TOKEN: ${{ secrets.FOOTBALL_DATA_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+
+      - name: Restore provider cache
+        uses: actions/cache@v4
+        with:
+          path: data/raw
+          key: football-data-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            football-data-${{ runner.os }}-
+
+      - name: Collect and normalize World Cup 2022
+        run: |
+          kinela collect statsbomb-world-cup-2022
+          kinela normalize statsbomb-world-cup-2022
+
+      - name: Collect API-Football team
+        if: ${{ inputs.api_football_team_id != '' && env.APISPORTS_KEY != '' }}
+        run: >-
+          kinela collect api-football-team
+          --team-id "${{ inputs.api_football_team_id }}"
+          --last 15
+          --details
+
+      - name: Collect recent World Cup team matches incrementally
+        if: ${{ inputs.collect_world_cup_teams && env.APISPORTS_KEY != '' }}
+        run: >-
+          kinela collect api-football-world-cup-teams
+          --last 15
+          --detail-limit 25
+
+      - name: Collect football-data.org team
+        if: ${{ inputs.football_data_team_id != '' && env.FOOTBALL_DATA_TOKEN != '' }}
+        run: >-
+          kinela collect football-data-team
+          --team-id "${{ inputs.football_data_team_id }}"
+          --last 15
+
+      - name: Collect current World Cup team matches
+        if: ${{ inputs.collect_current_world_cup_teams && env.FOOTBALL_DATA_TOKEN != '' }}
+        run: kinela collect football-data-world-cup-teams --last 15
+
+      - name: Upload normalized tables
+        uses: actions/upload-artifact@v4
+        with:
+          name: kinela-processed-data
+          path: data/processed
+          retention-days: 30

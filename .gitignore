@@ -1,0 +1,35 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+*.egg-info/
+PROJECT_CONTEXT.md
+
+# Downloaded provider payloads and generated tables.
+data/raw/
+data/processed/
+data/manifests/
+data/models/
+
+# Generated reports, prediction drops, experiments, and model diagnostics.
+outputs/
+
+# Local spreadsheet/model artifacts.
+*.joblib
+*.pkl
+*.xlsx
+
+# Keep the repo focused on the production path. Exploratory scripts stay local.
+scripts/*
+!scripts/audit_worldcup2026_manual_detail_coverage.py
+!scripts/predict_next4_with_all_played_worldcup.py
+!scripts/run_worldcup2026_top4_simulation.py
+!scripts/update_worldcup2026_manual_detail_from_espn.py
+!scripts/update_worldcup2026_manual_detail_from_thescore.py
+!scripts/worldcup2026_default_auc_evaluation.py
