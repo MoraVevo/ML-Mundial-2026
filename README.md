@@ -3,13 +3,12 @@
 Pipeline reproducible para recolectar datos de futbol, construir variables
 prepartido y generar predicciones para el Mundial 2026.
 
-El repositorio contiene el modelo neutral del proyecto, datos estaticos
-necesarios para el calendario/resultados manuales, scripts operativos y pruebas
-automatizadas. Los datos crudos, matrices generadas, modelos entrenados y
+El repositorio contiene datos estaticos necesarios para el calendario/resultados manuales,
+scripts operativos y pruebas automatizadas. Los datos crudos, matrices generadas, modelos entrenados y
 salidas de prediccion se mantienen fuera de Git.
 
 Este repositorio se publica como demostracion tecnica y portafolio. El codigo,
-la arquitectura del modelo, el diseno de features, reportes y assets son
+la arquitectura del modelo, el diseño de features, reportes y assets son
 propietarios; no se concede permiso para copiar, reutilizar, redistribuir o
 explotar comercialmente el proyecto sin autorizacion previa.
 
@@ -28,10 +27,7 @@ Los artefactos generados se escriben en `data/processed/`, `data/models/` y
 
 Las credenciales de proveedores no se versionan. API-Football tiene una cuota
 diaria limitada, por lo que la recoleccion completa esta pensada como un paso
-operativo del mantenedor del proyecto. El codigo, las pruebas, los datos
-estaticos y el reporte tecnico si quedan ordenados para que el pipeline pueda
-revisarse y reproducirse con credenciales propias.
-
+operativo del mantenedor del proyecto. 
 ## Instalacion
 
 ```powershell
