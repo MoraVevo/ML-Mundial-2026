@@ -1,6 +1,6 @@
 # Evaluacion del modelo
 
-Este reporte evalua el modelo neutral con cortes temporales disenados para que los partidos de test no entren al entrenamiento.
+Este reporte evalua el modelo neutral con cortes temporales diseñados para que los partidos de test no entren al entrenamiento.
 
 Identificador del modelo: `neutral_worldcup_v1`
 
