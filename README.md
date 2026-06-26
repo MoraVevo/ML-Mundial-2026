@@ -1,14 +1,26 @@
 # ML Mundial 2026
 
-Pipeline reproducible para recolectar datos de futbol, construir variables
-prepartido y generar predicciones para el Mundial 2026.
+Modelo de machine learning para prediccion de partidos del Mundial 2026, con
+65.38% de accuracy en test aleatorio temporal y 56.67% de accuracy sobre 60
+partidos ya disputados del Mundial. El proyecto destaca por lograr poder
+predictivo con datos limitados, controles anti-leakage y una receta parsimoniosa
+de 12 variables prepartido.
 
-El repositorio contiene datos estaticos necesarios para el calendario/resultados manuales,
-scripts operativos y pruebas automatizadas. Los datos crudos, matrices generadas, modelos entrenados y
-salidas de prediccion se mantienen fuera de Git.
+| Evaluacion | Accuracy | Correctos | Partidos | Lectura rapida |
+|---|---:|---:|---:|---|
+| Test aleatorio temporal | 65.38% | 68/104 | 104 | Generalizacion en partidos oficiales recientes no vistos |
+| Test Mundial 2026 | 56.67% | 34/60 | 60 | Rendimiento sobre partidos reales ya jugados del Mundial |
+
+Pipeline reproducible para recolectar datos de futbol, construir variables
+prepartido, entrenar el modelo y generar predicciones.
+
+El repositorio contiene datos estaticos necesarios para el
+calendario/resultados manuales, scripts operativos y pruebas automatizadas. Los
+datos crudos, matrices generadas, modelos entrenados y salidas de prediccion se
+mantienen fuera de Git.
 
 Este repositorio se publica como demostracion tecnica y portafolio. El codigo,
-la arquitectura del modelo, el diseño de features, reportes y assets son
+la arquitectura del modelo, el diseno de features, reportes y assets son
 propietarios; no se concede permiso para copiar, reutilizar, redistribuir o
 explotar comercialmente el proyecto sin autorizacion previa.
 
@@ -27,7 +39,8 @@ Los artefactos generados se escriben en `data/processed/`, `data/models/` y
 
 Las credenciales de proveedores no se versionan. API-Football tiene una cuota
 diaria limitada, por lo que la recoleccion completa esta pensada como un paso
-operativo del mantenedor del proyecto. 
+operativo del mantenedor del proyecto.
+
 ## Instalacion
 
 ```powershell
@@ -44,8 +57,8 @@ El proyecto sigue una sola secuencia de trabajo:
 1. Recolectar datos de proveedores y guardarlos en cache local.
 2. Normalizar las fuentes a tablas consistentes.
 3. Construir el frame de entrenamiento nacional.
-4. Exportar la matriz limpia y la matriz neutral del modelo.
-5. Entrenar el modelo neutral de Mundial.
+4. Exportar la matriz limpia y la matriz final del modelo.
+5. Entrenar el modelo de Mundial.
 6. Recalcular metricas y reporte tecnico.
 7. Generar predicciones para los proximos partidos.
 
@@ -102,8 +115,8 @@ analisis de error e importancia de features esta en
 
 ## Modelo
 
-El modelo de produccion es neutral y usa variables prepartido de ranking, forma
-reciente, balance de goles, contexto de fase y compatibilidad tactica.
+El modelo de produccion usa variables prepartido de ranking, forma reciente,
+balance de goles, contexto de fase y compatibilidad tactica.
 
 La evaluacion principal reporta accuracy sobre partidos ya jugados del Mundial
 2026. Esos partidos se separan como test y no se usan para entrenar el modelo
