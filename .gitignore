@@ -17,7 +17,7 @@ data/processed/
 data/manifests/
 data/models/
 
-# Generated reports, prediction drops, experiments, and model diagnostics.
+# Generated reports, prediction drops, and local model diagnostics.
 outputs/
 
 # Local spreadsheet/model artifacts.
@@ -33,4 +33,4 @@ scripts/*
 !scripts/update_worldcup2026_manual_detail_from_espn.py
 !scripts/update_worldcup2026_manual_detail_from_thescore.py
 !scripts/generate_model_evaluation_report.py
-!scripts/worldcup2026_default_auc_evaluation.py
+!scripts/worldcup2026_model_metrics.py

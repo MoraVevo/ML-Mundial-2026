@@ -2,7 +2,7 @@ import pandas as pd
 
 import scripts.generate_model_evaluation_report as report
 import scripts.predict_next4_with_all_played_worldcup as all_played
-import scripts.worldcup2026_default_auc_evaluation as auc_evaluation
+import scripts.worldcup2026_model_metrics as model_metrics
 
 
 def test_worldcup_split_uses_only_prior_training_rows() -> None:
@@ -86,7 +86,7 @@ def test_latest_manual_result_date_uses_manual_file(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    assert auc_evaluation._latest_manual_result_date(tmp_path) == "2026-06-24"
+    assert model_metrics._latest_manual_result_date(tmp_path) == "2026-06-24"
 
 
 def test_all_played_dedup_preserves_training_order_after_priority_choice() -> None:

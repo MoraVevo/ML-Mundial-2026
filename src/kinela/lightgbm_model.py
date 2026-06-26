@@ -301,6 +301,7 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "rating_drift_abs",
     "match_script_compatibility_edge",
     "clinical_low_block_matchup_edge",
+    "club_attack_talent_edge",
 ]
 NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v1"
 NEUTRAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES

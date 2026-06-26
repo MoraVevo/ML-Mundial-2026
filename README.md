@@ -8,6 +8,11 @@ necesarios para el calendario/resultados manuales, scripts operativos y pruebas
 automatizadas. Los datos crudos, matrices generadas, modelos entrenados y
 salidas de prediccion se mantienen fuera de Git.
 
+Este repositorio se publica como demostracion tecnica y portafolio. El codigo,
+la arquitectura del modelo, el diseno de features, reportes y assets son
+propietarios; no se concede permiso para copiar, reutilizar, redistribuir o
+explotar comercialmente el proyecto sin autorizacion previa.
+
 ## Fuentes
 
 | Fuente | Uso | Credencial |
@@ -21,6 +26,12 @@ Las respuestas originales se guardan en `data/raw/` y se reutilizan desde cache.
 Los artefactos generados se escriben en `data/processed/`, `data/models/` y
 `outputs/`; esas rutas estan ignoradas para mantener el repo liviano.
 
+Las credenciales de proveedores no se versionan. API-Football tiene una cuota
+diaria limitada, por lo que la recoleccion completa esta pensada como un paso
+operativo del mantenedor del proyecto. El codigo, las pruebas, los datos
+estaticos y el reporte tecnico si quedan ordenados para que el pipeline pueda
+revisarse y reproducirse con credenciales propias.
+
 ## Instalacion
 
 ```powershell
@@ -30,33 +41,58 @@ pip install -e ".[dev]"
 pytest
 ```
 
-## Flujo principal
+## Pipeline principal
+
+El proyecto sigue una sola secuencia de trabajo:
+
+1. Recolectar datos de proveedores y guardarlos en cache local.
+2. Normalizar las fuentes a tablas consistentes.
+3. Construir el frame de entrenamiento nacional.
+4. Exportar la matriz limpia y la matriz neutral del modelo.
+5. Entrenar el modelo neutral de Mundial.
+6. Recalcular metricas y reporte tecnico.
+7. Generar predicciones para los proximos partidos.
+
+### 1. Recoleccion
 
 ```powershell
 kinela collect fifa-ranking
 kinela collect football-data-bulk
 kinela collect api-football-world-cup-teams --last 15 --detail-limit 100
+```
 
+### 2. Limpieza y normalizacion
+
+```powershell
 kinela normalize api-football
 kinela normalize football-data
 kinela normalize fifa-ranking
+```
 
+### 3. Features y matrices
+
+```powershell
 kinela export training-frame-national
 kinela export clean-training-matrix-national
 kinela export neutral-training-matrix-national
+```
+
+### 4. Entrenamiento
+
+```powershell
 kinela train lightgbm-neutral
 ```
 
-Para actualizar resultados jugados del Mundial 2026 y recalcular metricas:
+### 5. Metricas
 
 ```powershell
 python scripts\update_worldcup2026_manual_detail_from_espn.py
 python scripts\update_worldcup2026_manual_detail_from_thescore.py
 python scripts\audit_worldcup2026_manual_detail_coverage.py
-python scripts\worldcup2026_default_auc_evaluation.py
+python scripts\worldcup2026_model_metrics.py
 ```
 
-Para generar predicciones de los proximos partidos:
+### 6. Prediccion
 
 ```powershell
 python scripts\predict_next4_with_all_played_worldcup.py --limit 4
@@ -92,8 +128,8 @@ data/static/       Calendario, resultados manuales y configuracion estatica
 
 ## Higiene del repositorio
 
-Este repo esta preparado para poder hacerse publico despues de una revision
-final. Por defecto no versiona:
+El repo mantiene fuera de Git los insumos pesados, credenciales y artefactos
+generados. Por defecto no versiona:
 
 - credenciales locales ni archivos `.env`
 - respuestas crudas de proveedores
@@ -103,6 +139,17 @@ final. Por defecto no versiona:
 
 ## GitHub Actions
 
-`CI` ejecuta lint y pruebas. `Collect football data` permite refrescar datos en
-ejecuciones programadas o manuales y publica tablas procesadas como artifact
-temporal.
+`CI` ejecuta lint y pruebas.
+
+`Collect football data` es una automatizacion operativa para el mantenedor:
+requiere secrets de proveedores, usa cache de respuestas y esta limitada por la
+cuota diaria de las APIs. No es la via principal para que un usuario externo
+pruebe el modelo; el orden reproducible del proyecto esta documentado en el
+pipeline principal.
+
+## Licencia
+
+Copyright (c) 2026 MoraVevo. Todos los derechos reservados. Este proyecto se
+publica para revision de portafolio y demostracion tecnica; cualquier uso,
+copia, modificacion, redistribucion o explotacion comercial requiere permiso
+previo por escrito.

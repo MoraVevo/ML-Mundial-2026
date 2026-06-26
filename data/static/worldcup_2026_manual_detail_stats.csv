@@ -43,6 +43,10 @@ match_id,team,shots_on_goal,shots_off_goal,total_shots,blocked_shots,shots_insid
 537347,Turkey,5,,32,12,,,14,12,2,78.5,1,0,1,629,559,90,,,ESPN event 760443,ESPN summary API used to fill blank fields.
 537348,Australia,2,,5,0,,,16,4,0,38.1,4,0,1,310,219,70,,,ESPN event 760442,ESPN summary API used to fill blank fields.
 537348,United States,2,,10,6,,,12,7,1,61.9,3,0,2,523,444,80,,,ESPN event 760442,ESPN summary API used to fill blank fields.
+537349,Turkey,3,,9,2,,,13,2,2,47.4,0,0,5,434,335,80,,,ESPN event 760470,ESPN summary API used to fill blank fields.
+537349,United States,7,,18,5,,,13,9,5,52.6,1,0,1,471,398,80,,,ESPN event 760470,ESPN summary API used to fill blank fields.
+537350,Australia,5,,12,3,,,6,3,0,56,1,0,2,537,438,80,,,ESPN event 760469,ESPN summary API used to fill blank fields.
+537350,Paraguay,2,,7,1,,,9,1,0,44,1,0,5,426,330,80,,,ESPN event 760469,ESPN summary API used to fill blank fields.
 537351,Curaçao,2,,8,0,,,11,1,0,35.4,0,0,4,343,282,80,,,theScore event 93083; ESPN event 760422,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537351,Germany,12,,26,8,,,18,8,1,64.6,0,0,1,637,554,90,,,theScore event 93083; ESPN event 760422,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537352,Ecuador,1,,12,3,,,13,6,0,51.6,1,0,3,492,419,90,,,theScore event 93082; ESPN event 760423,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
@@ -51,6 +55,10 @@ match_id,team,shots_on_goal,shots_off_goal,total_shots,blocked_shots,shots_insid
 537353,Ivory Coast,2,,9,5,,,7,3,1,40.5,0,0,5,431,367,90,,,ESPN event 760448,ESPN summary API used to fill blank fields.
 537354,Curaçao,3,,10,3,,,10,0,2,25.4,5,0,15,227,159,70,,,ESPN event 760446,ESPN summary API used to fill blank fields.
 537354,Ecuador,15,,27,2,,,7,9,1,74.6,1,0,3,644,581,90,,,ESPN event 760446,ESPN summary API used to fill blank fields.
+537355,Ecuador,3,,7,2,,,15,3,1,38.9,3,0,2,378,312,80,,,ESPN event 760468,ESPN summary API used to fill blank fields.
+537355,Germany,3,,11,5,,,10,2,0,61.1,1,0,1,592,517,90,,,ESPN event 760468,ESPN summary API used to fill blank fields.
+537356,Curaçao,2,,11,2,,,11,4,2,36.7,2,0,1,355,295,80,,,ESPN event 760473,ESPN summary API used to fill blank fields.
+537356,Ivory Coast,3,,7,1,,,6,6,1,63.3,1,0,2,624,558,90,,,ESPN event 760473,ESPN summary API used to fill blank fields.
 537357,Japan,3,,10,1,,,7,4,1,40.2,0,0,4,341,286,80,,,theScore event 93084; ESPN event 760425,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537357,Netherlands,6,,10,1,,,7,5,0,59.8,3,0,1,524,463,90,,,theScore event 93084; ESPN event 760425,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537358,Sweden,7,,13,3,,,10,4,6,48.7,0,0,1,356,278,80,,,theScore event 93099; ESPN event 760424,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
@@ -59,6 +67,10 @@ match_id,team,shots_on_goal,shots_off_goal,total_shots,blocked_shots,shots_insid
 537359,Sweden,8,,16,3,,,12,5,3,49.1,3,0,2,425,361,80,,,ESPN event 760447,ESPN summary API used to fill blank fields.
 537360,Japan,5,,11,3,,,15,5,1,62.1,0,0,0,583,521,90,,,ESPN event 760449,ESPN summary API used to fill blank fields.
 537360,Tunisia,0,,2,1,,,8,3,1,37.9,0,0,1,354,284,80,,,ESPN event 760449,ESPN summary API used to fill blank fields.
+537361,Netherlands,7,,20,5,,,10,6,1,71.4,0,0,3,647,602,90,,,ESPN event 760472,ESPN summary API used to fill blank fields.
+537361,Tunisia,4,,10,1,,,11,4,2,28.6,0,0,4,258,199,80,,,ESPN event 760472,ESPN summary API used to fill blank fields.
+537362,Japan,3,,8,2,,,20,2,3,52.3,1,0,4,445,378,80,,,ESPN event 760471,ESPN summary API used to fill blank fields.
+537362,Sweden,5,,11,3,,,11,8,2,47.7,2,0,2,395,312,80,,,ESPN event 760471,ESPN summary API used to fill blank fields.
 537363,Belgium,3,,15,5,,,15,2,1,53.6,2,0,2,455,391,90,,,theScore event 93079; ESPN event 760426,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537363,Egypt,3,,14,7,,,15,7,0,46.4,2,0,3,398,323,80,,,theScore event 93079; ESPN event 760426,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537364,Iran,4,,17,5,,,10,4,0,48.5,1,0,6,409,314,80,,,theScore event 93078; ESPN event 760427,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.

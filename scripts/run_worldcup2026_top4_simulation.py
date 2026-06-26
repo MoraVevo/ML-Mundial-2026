@@ -37,12 +37,17 @@ def run_top4_simulation(
     *,
     simulations: int,
     seed: int,
-    engine: str,
     progress_every: int,
     frozen_context_cache: bool,
 ) -> dict[str, Any]:
+    engine = "lightgbm"
     simulator = WorldCup2026Simulator(data_root, seed=seed, engine=engine)
     model_path = _selected_model_path(data_root, engine)
+    if simulator.lightgbm_model is None:
+        raise FileNotFoundError(
+            "Missing trained LightGBM model. Run `kinela train lightgbm-neutral` "
+            "or `python scripts\\predict_next4_with_all_played_worldcup.py` first."
+        )
     if frozen_context_cache and simulator.lightgbm_model is not None:
         class NoClearPredictionCache(dict):
             def clear(self) -> None:
@@ -120,8 +125,7 @@ def run_top4_simulation(
         "metadata": {
             "simulations": simulations,
             "seed": seed,
-            "engine_requested": engine,
-            "engine_used": engine if simulator.lightgbm_model is not None or engine != "lightgbm" else "poisson_fallback",
+            "engine": engine,
             "model_path": model_path,
             "third_place_assignment": "exact_495_combination_table",
             "frozen_context_cache": frozen_context_cache,
@@ -143,7 +147,6 @@ def main() -> None:
     parser.add_argument("--data-root", default="data")
     parser.add_argument("--runs", type=int, default=15000)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--engine", choices=["lightgbm", "poisson"], default="lightgbm")
     parser.add_argument("--progress-every", type=int, default=1000)
     parser.add_argument("--frozen-context-cache", action="store_true")
     args = parser.parse_args()
@@ -152,7 +155,6 @@ def main() -> None:
         Path(args.data_root),
         simulations=args.runs,
         seed=args.seed,
-        engine=args.engine,
         progress_every=args.progress_every,
         frozen_context_cache=args.frozen_context_cache,
     )

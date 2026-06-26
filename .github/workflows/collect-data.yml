@@ -12,7 +12,7 @@ on:
         required: false
         type: string
       collect_world_cup_teams:
-        description: "Collect recent matches for all 2022 World Cup teams"
+        description: "Collect recent matches for tracked World Cup teams"
         required: false
         default: false
         type: boolean
@@ -48,7 +48,7 @@ jobs:
           restore-keys: |
             football-data-${{ runner.os }}-
 
-      - name: Collect and normalize World Cup 2022
+      - name: Collect and normalize StatsBomb World Cup history
         run: |
           kinela collect statsbomb-world-cup-2022
           kinela normalize statsbomb-world-cup-2022

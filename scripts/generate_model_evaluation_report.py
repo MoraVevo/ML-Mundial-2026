@@ -438,6 +438,7 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         "rating_drift_abs": "Magnitud del cambio reciente entre rating historico y rating vivo; captura incertidumbre/volatilidad.",
         "match_script_compatibility_edge": "Compatibilidad tactica estimada entre estilos de partido de ambos equipos.",
         "clinical_low_block_matchup_edge": "Cruce entre definicion ofensiva y capacidad/riesgo contra bloques bajos.",
+        "club_attack_talent_edge": "Ventaja de talento ofensivo de plantel/club cuando hay cobertura previa suficiente; faltantes reducen cobertura en vez de inventar valor.",
     }
     draw_notes = []
     for result in results:

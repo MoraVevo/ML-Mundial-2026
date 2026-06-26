@@ -11,8 +11,8 @@ Identificador del modelo: `neutral_worldcup_v1`
 Los partidos jugados del Mundial 2026 se fuerzan como test. El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; esos partidos de test no se usan para entrenar.
 
 - Partidos de entrenamiento: 787
-- Partidos de test: 54
-- Ventana de test: 2026-06-11 a 2026-06-25
+- Partidos de test: 60
+- Ventana de test: 2026-06-11 a 2026-06-26
 
 ### Test externo temporal
 
@@ -26,8 +26,8 @@ Test aleatorio de 104 partidos nacionales no amistosos y fuera del Mundial 2026,
 
 | Evaluacion | Accuracy | Correctos | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Test Mundial 2026 | 0.5370 | 29/54 | 0.9762 | 1.1763 | 0.8515 | 1.0139 |
-| Test externo temporal | 0.6635 | 69/104 | 0.8949 | 0.9929 | 1.0552 | 1.0240 |
+| Test Mundial 2026 | 0.5667 | 34/60 | 0.9578 | 1.1325 | 0.8921 | 1.0123 |
+| Test externo temporal | 0.6538 | 68/104 | 0.8910 | 1.0039 | 1.0573 | 1.0306 |
 
 ![Resumen de metricas](assets/model_evaluation/metrics_summary.png)
 
@@ -37,7 +37,7 @@ El modelo es util para direccionar ganadores, pero el umbral actual es conservad
 
 | Evaluacion | Empates reales | Empates predichos como clase principal |
 |---|---:|---:|
-| Test Mundial 2026 | 14 | 0 |
+| Test Mundial 2026 | 16 | 0 |
 | Test externo temporal | 22 | 0 |
 
 Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo esta asignando probabilidad util a empates y partidos cerrados. El MAE se reporta aparte porque los regresores de goles pueden estar razonablemente calibrados aunque el clasificador 1X2 elija otra clase.
@@ -60,14 +60,14 @@ Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo 
 
 | Feature | Importancia |
 |---|---:|
-| `draw_pressure_index` | 2670.00 |
-| `quality_form_edge` | 2282.67 |
-| `rating_guardrail_edge` | 2274.00 |
-| `score_control_value_edge` | 2194.67 |
-| `rating_drift_abs` | 2089.67 |
-| `clinical_low_block_matchup_edge` | 2071.00 |
-| `match_script_compatibility_edge` | 2018.00 |
-| `rating_threat_edge` | 1825.00 |
+| `draw_pressure_index` | 2575.00 |
+| `rating_guardrail_edge` | 2185.67 |
+| `score_control_value_edge` | 2177.67 |
+| `quality_form_edge` | 2143.33 |
+| `match_script_compatibility_edge` | 2108.00 |
+| `clinical_low_block_matchup_edge` | 2092.67 |
+| `rating_drift_abs` | 2045.00 |
+| `rating_threat_edge` | 1840.00 |
 
 ### Test externo temporal
 
@@ -75,14 +75,14 @@ Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo 
 
 | Feature | Importancia |
 |---|---:|
-| `draw_pressure_index` | 2014.67 |
-| `rating_guardrail_edge` | 1664.00 |
-| `rating_drift_abs` | 1568.67 |
-| `match_script_compatibility_edge` | 1532.67 |
-| `quality_form_edge` | 1521.67 |
-| `score_control_value_edge` | 1494.33 |
-| `rating_threat_edge` | 1446.33 |
-| `clinical_low_block_matchup_edge` | 1423.00 |
+| `draw_pressure_index` | 2026.33 |
+| `rating_guardrail_edge` | 1646.67 |
+| `rating_drift_abs` | 1556.00 |
+| `quality_form_edge` | 1531.67 |
+| `match_script_compatibility_edge` | 1526.00 |
+| `score_control_value_edge` | 1512.67 |
+| `rating_threat_edge` | 1441.00 |
+| `clinical_low_block_matchup_edge` | 1439.33 |
 
 ## Analisis de error
 
@@ -94,21 +94,21 @@ Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| FIFA World Cup | 54 | 0.5370 | 0.9762 | 1.1763 | 0.8515 | 1.0139 |
+| FIFA World Cup | 60 | 0.5667 | 0.9578 | 1.1325 | 0.8921 | 1.0123 |
 
 #### Por fase/ronda
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| GROUP_STAGE | 54 | 0.5370 | 0.9762 | 1.1763 | 0.8515 | 1.0139 |
+| GROUP_STAGE | 60 | 0.5667 | 0.9578 | 1.1325 | 0.8921 | 1.0123 |
 
 #### Por resultado real
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Equipo A | 29 | 0.6552 | n/a | 1.3875 | 0.7993 | 1.0934 |
-| Equipo B | 11 | 0.9091 | n/a | 0.7719 | 1.3160 | 1.0439 |
-| Empate | 14 | 0.0000 | n/a | 1.0565 | 0.5947 | 0.8256 |
+| Equipo A | 31 | 0.7097 | n/a | 1.1896 | 0.8468 | 1.0182 |
+| Equipo B | 13 | 0.9231 | n/a | 0.8614 | 1.1659 | 1.0137 |
+| Empate | 16 | 0.0000 | n/a | 1.2421 | 0.7573 | 0.9997 |
 
 ### Test externo temporal
 
@@ -116,37 +116,37 @@ Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| World Cup - Qualification Europe | 40 | 0.8250 | 0.7719 | 1.2239 | 1.0468 | 1.1353 |
-| World Cup - Qualification Africa | 19 | 0.7895 | 0.8000 | 0.9604 | 1.2187 | 1.0896 |
-| UEFA Nations League | 29 | 0.4483 | 1.0566 | 0.8845 | 0.9754 | 0.9300 |
-| African Nations Championship - Qualification | 2 | 0.5000 | n/a | 0.5666 | 1.2570 | 0.9118 |
-| CONCACAF Nations League | 9 | 0.6667 | 0.9229 | 0.6149 | 1.1211 | 0.8680 |
-| Gulf Cup of Nations | 5 | 0.2000 | 1.1903 | 0.7472 | 0.7638 | 0.7555 |
+| World Cup - Qualification Europe | 40 | 0.8250 | 0.7653 | 1.2179 | 1.0487 | 1.1333 |
+| World Cup - Qualification Africa | 19 | 0.7895 | 0.7961 | 0.9963 | 1.2208 | 1.1086 |
+| African Nations Championship - Qualification | 2 | 0.5000 | n/a | 0.5774 | 1.3367 | 0.9570 |
+| UEFA Nations League | 29 | 0.4138 | 1.0568 | 0.8945 | 0.9727 | 0.9336 |
+| CONCACAF Nations League | 9 | 0.6667 | 0.9195 | 0.6254 | 1.1539 | 0.8896 |
+| Gulf Cup of Nations | 5 | 0.2000 | 1.1781 | 0.8069 | 0.7099 | 0.7584 |
 
 #### Por fase/ronda
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| League A - 1 | 1 | 1.0000 | n/a | 3.1572 | 1.2302 | 2.1937 |
-| League B - 6 | 1 | 1.0000 | n/a | 2.4988 | 0.8822 | 1.6905 |
-| League A - 5 | 2 | 1.0000 | 0.6434 | 2.2743 | 0.7022 | 1.4883 |
-| GROUP_STAGE | 61 | 0.7869 | 0.7969 | 1.0822 | 1.1030 | 1.0926 |
-| Play-offs A/B | 3 | 0.0000 | 1.4196 | 1.2841 | 0.8250 | 1.0546 |
-| League A - 2 | 2 | 0.5000 | 1.0469 | 0.3279 | 1.7322 | 1.0300 |
-| SEMI_FINALS | 4 | 0.5000 | 0.9984 | 1.3797 | 0.6402 | 1.0099 |
-| QUARTER_FINALS | 9 | 0.3333 | 1.0716 | 0.7508 | 1.1954 | 0.9731 |
+| League A - 1 | 1 | 1.0000 | n/a | 2.9460 | 1.2126 | 2.0793 |
+| League B - 6 | 1 | 1.0000 | n/a | 2.4275 | 0.8813 | 1.6544 |
+| League A - 5 | 2 | 1.0000 | 0.6236 | 2.1993 | 0.9365 | 1.5679 |
+| GROUP_STAGE | 61 | 0.7869 | 0.7933 | 1.0947 | 1.0972 | 1.0959 |
+| League A - 2 | 2 | 0.5000 | 1.0802 | 0.3925 | 1.7652 | 1.0788 |
+| Play-offs A/B | 3 | 0.0000 | 1.4159 | 1.2684 | 0.8335 | 1.0509 |
+| QUARTER_FINALS | 9 | 0.3333 | 1.0601 | 0.8091 | 1.2193 | 1.0142 |
+| SEMI_FINALS | 4 | 0.5000 | 0.9484 | 1.3674 | 0.6175 | 0.9925 |
 
 #### Por resultado real
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Equipo A | 45 | 0.8000 | n/a | 1.3552 | 0.7892 | 1.0722 |
-| Empate | 22 | 0.0000 | n/a | 0.7525 | 1.2590 | 1.0057 |
-| Equipo B | 37 | 0.8919 | n/a | 0.6952 | 1.2574 | 0.9763 |
+| Equipo A | 45 | 0.7778 | n/a | 1.3566 | 0.7878 | 1.0722 |
+| Empate | 22 | 0.0000 | n/a | 0.7335 | 1.2671 | 1.0003 |
+| Equipo B | 37 | 0.8919 | n/a | 0.7357 | 1.2602 | 0.9980 |
 
 ## Construccion de features
 
-El modelo activo usa 11 features prepartido:
+El modelo activo usa 12 features prepartido:
 
 | Feature | Significado |
 |---|---|
@@ -161,6 +161,7 @@ El modelo activo usa 11 features prepartido:
 | `rating_drift_abs` | Magnitud del cambio reciente entre rating historico y rating vivo; captura incertidumbre/volatilidad. |
 | `match_script_compatibility_edge` | Compatibilidad tactica estimada entre estilos de partido de ambos equipos. |
 | `clinical_low_block_matchup_edge` | Cruce entre definicion ofensiva y capacidad/riesgo contra bloques bajos. |
+| `club_attack_talent_edge` | Ventaja de talento ofensivo de plantel/club cuando hay cobertura previa suficiente; faltantes reducen cobertura en vez de inventar valor. |
 
 Grupos conceptuales:
 

@@ -54,7 +54,7 @@ def main() -> None:
         "confusion": result.confusion,
     }
     output = Path(
-        f"outputs/worldcup2026_default_auc_evaluation_{_latest_manual_result_date(data_root)}.json"
+        f"outputs/worldcup2026_model_metrics_{_latest_manual_result_date(data_root)}.json"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
