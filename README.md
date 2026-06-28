@@ -14,11 +14,11 @@ de 12 variables prepartido.
 ## Bracket premundial
 
 Antes de incorporar cualquier resultado jugado del Mundial 2026, el modelo
-simula 5,000 torneos completos con contexto congelado premundial. Esta vista
-permite comparar lo que el modelo esperaba antes del torneo contra lo que ya
-esta ocurriendo en la cancha: no usa partidos disputados del Mundial, excluye 60
-filas de historial 2026 y resume los cruces mas frecuentes del bracket
-consenso con la receta prepartido.
+construye una ruta premundial coherente: fase de grupos, 12 primeros, 12
+segundos, 8 mejores terceros con la tabla exacta de 495 combinaciones,
+dieciseisavos, octavos, cuartos, semifinales y final. La imagen no usa partidos
+disputados del Mundial, excluye 60 filas de historial 2026 y se acompana con el
+top de campeones de 5,000 simulaciones completas como contexto estadistico.
 
 ![Bracket premundial generado por el modelo](docs/assets/worldcup_2026_premundial_bracket.png)
 
