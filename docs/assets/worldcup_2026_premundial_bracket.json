@@ -1,695 +1,719 @@
 {
-  "simulations": 10000,
+  "source_output": "outputs\\premundial_full_1000_seed42.json",
+  "runs_completed": 5000,
   "seed": 42,
-  "started_at": "2026-06-26T20:40:28",
-  "finished_at": "2026-06-26T20:40:48",
-  "model_path": "data\\models\\lightgbm_neutral_model.joblib",
   "manual_results_used": false,
-  "history_rows_before_filter": 847,
-  "history_rows_after_filter": 787,
   "excluded_worldcup_2026_history_rows": 60,
-  "premundial_context": "frozen_pre_tournament_predictions",
-  "simulated_results_update_model_state": false,
-  "precomputed_prediction_cache_entries": 11352,
-  "champion_consensus": "France",
-  "champion_consensus_probability": 0.0822,
+  "simulation_mode": "full_worldcup_simulator_no_fast_vectorization",
+  "graphic_type": "full_simulation_consensus_bracket",
+  "note": "Top two entrants and slot winner are frequency leaders from the complete premundial simulation output.",
+  "champion_consensus": {
+    "team": "France",
+    "count": 382,
+    "probability": 0.0764
+  },
   "top_champions": [
     {
       "team": "France",
-      "probability": 0.0822
-    },
-    {
-      "team": "Argentina",
-      "probability": 0.0631
+      "count": 382,
+      "probability": 0.0764
     },
     {
       "team": "Spain",
-      "probability": 0.0616
-    },
-    {
-      "team": "Brazil",
-      "probability": 0.0564
+      "count": 278,
+      "probability": 0.0556
     },
     {
       "team": "Belgium",
-      "probability": 0.0472
+      "count": 230,
+      "probability": 0.046
     },
     {
       "team": "Mexico",
-      "probability": 0.044
-    },
-    {
-      "team": "England",
-      "probability": 0.0415
-    },
-    {
-      "team": "Portugal",
-      "probability": 0.0415
+      "count": 223,
+      "probability": 0.0446
     },
     {
       "team": "Morocco",
-      "probability": 0.0385
+      "count": 222,
+      "probability": 0.0444
     },
     {
-      "team": "Colombia",
-      "probability": 0.0381
+      "team": "Brazil",
+      "count": 218,
+      "probability": 0.0436
     },
     {
-      "team": "Croatia",
-      "probability": 0.0371
+      "team": "Portugal",
+      "count": 218,
+      "probability": 0.0436
     },
     {
-      "team": "Senegal",
-      "probability": 0.0367
+      "team": "Argentina",
+      "count": 211,
+      "probability": 0.0422
     }
   ],
   "top_finalists": [
     {
       "team": "France",
-      "probability": 0.1363
-    },
-    {
-      "team": "Argentina",
-      "probability": 0.1083
-    },
-    {
-      "team": "Brazil",
-      "probability": 0.1039
+      "count": 592,
+      "probability": 0.1184
     },
     {
       "team": "Spain",
-      "probability": 0.1038
+      "count": 450,
+      "probability": 0.09
     },
     {
-      "team": "Belgium",
-      "probability": 0.0852
+      "team": "Brazil",
+      "count": 449,
+      "probability": 0.0898
     },
     {
       "team": "Mexico",
-      "probability": 0.0829
+      "count": 421,
+      "probability": 0.0842
     },
     {
-      "team": "England",
-      "probability": 0.0772
-    },
-    {
-      "team": "Colombia",
-      "probability": 0.0761
-    },
-    {
-      "team": "Morocco",
-      "probability": 0.0751
+      "team": "Belgium",
+      "count": 400,
+      "probability": 0.08
     },
     {
       "team": "Portugal",
-      "probability": 0.0751
+      "count": 391,
+      "probability": 0.0782
     },
     {
-      "team": "Senegal",
-      "probability": 0.0746
+      "team": "Morocco",
+      "count": 388,
+      "probability": 0.0776
     },
     {
-      "team": "Uruguay",
-      "probability": 0.0697
+      "team": "Argentina",
+      "count": 380,
+      "probability": 0.076
     }
   ],
   "top_semifinalists": [
     {
       "team": "France",
-      "probability": 0.2229
-    },
-    {
-      "team": "Argentina",
-      "probability": 0.1848
-    },
-    {
-      "team": "Brazil",
-      "probability": 0.1843
+      "count": 909,
+      "probability": 0.1818
     },
     {
       "team": "Spain",
-      "probability": 0.184
+      "count": 829,
+      "probability": 0.1658
     },
     {
-      "team": "Belgium",
-      "probability": 0.1577
-    },
-    {
-      "team": "England",
-      "probability": 0.1514
+      "team": "Brazil",
+      "count": 799,
+      "probability": 0.1598
     },
     {
       "team": "Mexico",
-      "probability": 0.1496
+      "count": 752,
+      "probability": 0.1504
     },
     {
-      "team": "Colombia",
-      "probability": 0.145
+      "team": "Belgium",
+      "count": 730,
+      "probability": 0.146
+    },
+    {
+      "team": "Argentina",
+      "count": 707,
+      "probability": 0.1414
     },
     {
       "team": "Portugal",
-      "probability": 0.1416
+      "count": 704,
+      "probability": 0.1408
     },
     {
-      "team": "Morocco",
-      "probability": 0.1409
-    },
-    {
-      "team": "Senegal",
-      "probability": 0.1359
-    },
-    {
-      "team": "Uruguay",
-      "probability": 0.1314
+      "team": "Croatia",
+      "count": 668,
+      "probability": 0.1336
     }
   ],
   "bracket": {
     "73": {
       "match_id": 73,
-      "stage": "ROUND_OF_32",
-      "team_a": "Czechia",
-      "team_b": "Canada",
-      "support_a": 2938,
-      "support_b": 2775,
-      "probability_a": 0.4083,
-      "probability_draw": 0.2537,
-      "probability_b": 0.338,
-      "advance_probability_a": 0.5396,
-      "advance_probability_b": 0.4604,
-      "expected_goals_a": 1.579,
-      "expected_goals_b": 1.1,
-      "winner": "Czechia",
-      "winner_advance_probability": 0.5396
+      "team_a": {
+        "team": "Czechia",
+        "count": 1431,
+        "probability": 0.2862
+      },
+      "team_b": {
+        "team": "Mexico",
+        "count": 1360,
+        "probability": 0.272
+      },
+      "winner": {
+        "team": "Mexico",
+        "count": 800,
+        "probability": 0.16
+      }
     },
     "74": {
       "match_id": 74,
-      "stage": "ROUND_OF_32",
-      "team_a": "Ecuador",
-      "team_b": "Scotland",
-      "support_a": 3879,
-      "support_b": 1374,
-      "probability_a": 0.4102,
-      "probability_draw": 0.2539,
-      "probability_b": 0.3359,
-      "advance_probability_a": 0.5441,
-      "advance_probability_b": 0.4559,
-      "expected_goals_a": 1.976,
-      "expected_goals_b": 0.719,
-      "winner": "Ecuador",
-      "winner_advance_probability": 0.5441
+      "team_a": {
+        "team": "Ecuador",
+        "count": 1728,
+        "probability": 0.3456
+      },
+      "team_b": {
+        "team": "Germany",
+        "count": 1580,
+        "probability": 0.316
+      },
+      "winner": {
+        "team": "Ecuador",
+        "count": 921,
+        "probability": 0.1842
+      }
     },
     "75": {
       "match_id": 75,
-      "stage": "ROUND_OF_32",
-      "team_a": "Netherlands",
-      "team_b": "Morocco",
-      "support_a": 3746,
-      "support_b": 3179,
-      "probability_a": 0.245,
-      "probability_draw": 0.2576,
-      "probability_b": 0.4974,
-      "advance_probability_a": 0.3788,
-      "advance_probability_b": 0.6212,
-      "expected_goals_a": 1.67,
-      "expected_goals_b": 2.213,
-      "winner": "Morocco",
-      "winner_advance_probability": 0.6212
+      "team_a": {
+        "team": "Netherlands",
+        "count": 1802,
+        "probability": 0.3604
+      },
+      "team_b": {
+        "team": "Brazil",
+        "count": 1502,
+        "probability": 0.3004
+      },
+      "winner": {
+        "team": "Netherlands",
+        "count": 956,
+        "probability": 0.1912
+      }
     },
     "76": {
       "match_id": 76,
-      "stage": "ROUND_OF_32",
-      "team_a": "Brazil",
-      "team_b": "Japan",
-      "support_a": 4391,
-      "support_b": 2810,
-      "probability_a": 0.4789,
-      "probability_draw": 0.2327,
-      "probability_b": 0.2884,
-      "advance_probability_a": 0.5995,
-      "advance_probability_b": 0.4005,
-      "expected_goals_a": 1.388,
-      "expected_goals_b": 1.062,
-      "winner": "Brazil",
-      "winner_advance_probability": 0.5995
+      "team_a": {
+        "team": "Brazil",
+        "count": 1864,
+        "probability": 0.3728
+      },
+      "team_b": {
+        "team": "Morocco",
+        "count": 1777,
+        "probability": 0.3554
+      },
+      "winner": {
+        "team": "Brazil",
+        "count": 1122,
+        "probability": 0.2244
+      }
     },
     "77": {
       "match_id": 77,
-      "stage": "ROUND_OF_32",
-      "team_a": "France",
-      "team_b": "Sweden",
-      "support_a": 4747,
-      "support_b": 1587,
-      "probability_a": 0.5347,
-      "probability_draw": 0.2278,
-      "probability_b": 0.2375,
-      "advance_probability_a": 0.6516,
-      "advance_probability_b": 0.3484,
-      "expected_goals_a": 2.301,
-      "expected_goals_b": 0.417,
-      "winner": "France",
-      "winner_advance_probability": 0.6516
+      "team_a": {
+        "team": "France",
+        "count": 1845,
+        "probability": 0.369
+      },
+      "team_b": {
+        "team": "Senegal",
+        "count": 1208,
+        "probability": 0.2416
+      },
+      "winner": {
+        "team": "France",
+        "count": 1169,
+        "probability": 0.2338
+      }
     },
     "78": {
       "match_id": 78,
-      "stage": "ROUND_OF_32",
-      "team_a": "Germany",
-      "team_b": "Senegal",
-      "support_a": 3086,
-      "support_b": 3091,
-      "probability_a": 0.3244,
-      "probability_draw": 0.2521,
-      "probability_b": 0.4235,
-      "advance_probability_a": 0.4543,
-      "advance_probability_b": 0.5457,
-      "expected_goals_a": 1.081,
-      "expected_goals_b": 1.521,
-      "winner": "Senegal",
-      "winner_advance_probability": 0.5457
+      "team_a": {
+        "team": "Ecuador",
+        "count": 1415,
+        "probability": 0.283
+      },
+      "team_b": {
+        "team": "Germany",
+        "count": 1381,
+        "probability": 0.2762
+      },
+      "winner": {
+        "team": "France",
+        "count": 810,
+        "probability": 0.162
+      }
     },
     "79": {
       "match_id": 79,
-      "stage": "ROUND_OF_32",
-      "team_a": "Mexico",
-      "team_b": "Ivory Coast",
-      "support_a": 4235,
-      "support_b": 1157,
-      "probability_a": 0.3682,
-      "probability_draw": 0.3089,
-      "probability_b": 0.3229,
-      "advance_probability_a": 0.5148,
-      "advance_probability_b": 0.4852,
-      "expected_goals_a": 0.742,
-      "expected_goals_b": 0.653,
-      "winner": "Mexico",
-      "winner_advance_probability": 0.5148
+      "team_a": {
+        "team": "Mexico",
+        "count": 2159,
+        "probability": 0.4318
+      },
+      "team_b": {
+        "team": "Czechia",
+        "count": 1232,
+        "probability": 0.2464
+      },
+      "winner": {
+        "team": "Mexico",
+        "count": 1302,
+        "probability": 0.2604
+      }
     },
     "80": {
       "match_id": 80,
-      "stage": "ROUND_OF_32",
-      "team_a": "England",
-      "team_b": "Uzbekistan",
-      "support_a": 4024,
-      "support_b": 1789,
-      "probability_a": 0.567,
-      "probability_draw": 0.2324,
-      "probability_b": 0.2006,
-      "advance_probability_a": 0.6931,
-      "advance_probability_b": 0.3069,
-      "expected_goals_a": 3.045,
-      "expected_goals_b": 0.325,
-      "winner": "England",
-      "winner_advance_probability": 0.6931
+      "team_a": {
+        "team": "England",
+        "count": 1741,
+        "probability": 0.3482
+      },
+      "team_b": {
+        "team": "Croatia",
+        "count": 1440,
+        "probability": 0.288
+      },
+      "winner": {
+        "team": "England",
+        "count": 994,
+        "probability": 0.1988
+      }
     },
     "81": {
       "match_id": 81,
-      "stage": "ROUND_OF_32",
-      "team_a": "Turkey",
-      "team_b": "Qatar",
-      "support_a": 2928,
-      "support_b": 1898,
-      "probability_a": 0.5781,
-      "probability_draw": 0.2185,
-      "probability_b": 0.2034,
-      "advance_probability_a": 0.6966,
-      "advance_probability_b": 0.3034,
-      "expected_goals_a": 1.979,
-      "expected_goals_b": 0.767,
-      "winner": "Turkey",
-      "winner_advance_probability": 0.6966
+      "team_a": {
+        "team": "Turkey",
+        "count": 1487,
+        "probability": 0.2974
+      },
+      "team_b": {
+        "team": "Australia",
+        "count": 1440,
+        "probability": 0.288
+      },
+      "winner": {
+        "team": "Turkey",
+        "count": 828,
+        "probability": 0.1656
+      }
     },
     "82": {
       "match_id": 82,
-      "stage": "ROUND_OF_32",
-      "team_a": "Belgium",
-      "team_b": "South Korea",
-      "support_a": 4072,
-      "support_b": 1910,
-      "probability_a": 0.4338,
-      "probability_draw": 0.244,
-      "probability_b": 0.3222,
-      "advance_probability_a": 0.5639,
-      "advance_probability_b": 0.4361,
-      "expected_goals_a": 1.731,
-      "expected_goals_b": 1.37,
-      "winner": "Belgium",
-      "winner_advance_probability": 0.5639
+      "team_a": {
+        "team": "Belgium",
+        "count": 2016,
+        "probability": 0.4032
+      },
+      "team_b": {
+        "team": "Iran",
+        "count": 1508,
+        "probability": 0.3016
+      },
+      "winner": {
+        "team": "Belgium",
+        "count": 1142,
+        "probability": 0.2284
+      }
     },
     "83": {
       "match_id": 83,
-      "stage": "ROUND_OF_32",
-      "team_a": "Portugal",
-      "team_b": "Croatia",
-      "support_a": 3155,
-      "support_b": 2834,
-      "probability_a": 0.34,
-      "probability_draw": 0.2411,
-      "probability_b": 0.4189,
-      "advance_probability_a": 0.4635,
-      "advance_probability_b": 0.5365,
-      "expected_goals_a": 1.877,
-      "expected_goals_b": 1.405,
-      "winner": "Croatia",
-      "winner_advance_probability": 0.5365
+      "team_a": {
+        "team": "Portugal",
+        "count": 1414,
+        "probability": 0.2828
+      },
+      "team_b": {
+        "team": "Colombia",
+        "count": 1410,
+        "probability": 0.282
+      },
+      "winner": {
+        "team": "Croatia",
+        "count": 801,
+        "probability": 0.1602
+      }
     },
     "84": {
       "match_id": 84,
-      "stage": "ROUND_OF_32",
-      "team_a": "Spain",
-      "team_b": "Austria",
-      "support_a": 4506,
-      "support_b": 3113,
-      "probability_a": 0.569,
-      "probability_draw": 0.2169,
-      "probability_b": 0.2141,
-      "advance_probability_a": 0.6821,
-      "advance_probability_b": 0.3179,
-      "expected_goals_a": 2.019,
-      "expected_goals_b": 0.956,
-      "winner": "Spain",
-      "winner_advance_probability": 0.6821
+      "team_a": {
+        "team": "Spain",
+        "count": 2052,
+        "probability": 0.4104
+      },
+      "team_b": {
+        "team": "Uruguay",
+        "count": 1588,
+        "probability": 0.3176
+      },
+      "winner": {
+        "team": "Spain",
+        "count": 1225,
+        "probability": 0.245
+      }
     },
     "85": {
       "match_id": 85,
-      "stage": "ROUND_OF_32",
-      "team_a": "Switzerland",
-      "team_b": "Egypt",
-      "support_a": 3417,
-      "support_b": 1679,
-      "probability_a": 0.474,
-      "probability_draw": 0.2247,
-      "probability_b": 0.3013,
-      "advance_probability_a": 0.5885,
-      "advance_probability_b": 0.4115,
-      "expected_goals_a": 0.74,
-      "expected_goals_b": 1.123,
-      "winner": "Switzerland",
-      "winner_advance_probability": 0.5885
+      "team_a": {
+        "team": "Canada",
+        "count": 1568,
+        "probability": 0.3136
+      },
+      "team_b": {
+        "team": "Switzerland",
+        "count": 1490,
+        "probability": 0.298
+      },
+      "winner": {
+        "team": "Canada",
+        "count": 853,
+        "probability": 0.1706
+      }
     },
     "86": {
       "match_id": 86,
-      "stage": "ROUND_OF_32",
-      "team_a": "Argentina",
-      "team_b": "Uruguay",
-      "support_a": 4957,
-      "support_b": 3242,
-      "probability_a": 0.406,
-      "probability_draw": 0.2366,
-      "probability_b": 0.3573,
-      "advance_probability_a": 0.526,
-      "advance_probability_b": 0.474,
-      "expected_goals_a": 1.663,
-      "expected_goals_b": 1.062,
-      "winner": "Argentina",
-      "winner_advance_probability": 0.526
+      "team_a": {
+        "team": "Argentina",
+        "count": 2188,
+        "probability": 0.4376
+      },
+      "team_b": {
+        "team": "Uruguay",
+        "count": 1477,
+        "probability": 0.2954
+      },
+      "winner": {
+        "team": "Argentina",
+        "count": 1168,
+        "probability": 0.2336
+      }
     },
     "87": {
       "match_id": 87,
-      "stage": "ROUND_OF_32",
-      "team_a": "Colombia",
-      "team_b": "Ghana",
-      "support_a": 4165,
-      "support_b": 1776,
-      "probability_a": 0.4654,
-      "probability_draw": 0.237,
-      "probability_b": 0.2976,
-      "advance_probability_a": 0.5856,
-      "advance_probability_b": 0.4144,
-      "expected_goals_a": 1.968,
-      "expected_goals_b": 0.985,
-      "winner": "Colombia",
-      "winner_advance_probability": 0.5856
+      "team_a": {
+        "team": "Portugal",
+        "count": 1824,
+        "probability": 0.3648
+      },
+      "team_b": {
+        "team": "Colombia",
+        "count": 1557,
+        "probability": 0.3114
+      },
+      "winner": {
+        "team": "Portugal",
+        "count": 1042,
+        "probability": 0.2084
+      }
     },
     "88": {
       "match_id": 88,
-      "stage": "ROUND_OF_32",
-      "team_a": "Australia",
-      "team_b": "Iran",
-      "support_a": 2737,
-      "support_b": 3068,
-      "probability_a": 0.56,
-      "probability_draw": 0.2209,
-      "probability_b": 0.2192,
-      "advance_probability_a": 0.6693,
-      "advance_probability_b": 0.3307,
-      "expected_goals_a": 1.657,
-      "expected_goals_b": 1.536,
-      "winner": "Australia",
-      "winner_advance_probability": 0.6693
+      "team_a": {
+        "team": "Iran",
+        "count": 1471,
+        "probability": 0.2942
+      },
+      "team_b": {
+        "team": "Belgium",
+        "count": 1405,
+        "probability": 0.281
+      },
+      "winner": {
+        "team": "Belgium",
+        "count": 800,
+        "probability": 0.16
+      }
     },
     "89": {
       "match_id": 89,
-      "stage": "LAST_16",
-      "team_a": "Ecuador",
-      "team_b": "France",
-      "support_a": 2057,
-      "support_b": 2949,
-      "probability_a": 0.2807,
-      "probability_draw": 0.224,
-      "probability_b": 0.4953,
-      "advance_probability_a": 0.3906,
-      "advance_probability_b": 0.6094,
-      "expected_goals_a": 0.642,
-      "expected_goals_b": 1.4,
-      "winner": "France",
-      "winner_advance_probability": 0.6094
+      "team_a": {
+        "team": "France",
+        "count": 1169,
+        "probability": 0.2338
+      },
+      "team_b": {
+        "team": "Ecuador",
+        "count": 921,
+        "probability": 0.1842
+      },
+      "winner": {
+        "team": "France",
+        "count": 715,
+        "probability": 0.143
+      }
     },
     "90": {
       "match_id": 90,
-      "stage": "LAST_16",
-      "team_a": "Czechia",
-      "team_b": "Morocco",
-      "support_a": 1534,
-      "support_b": 1909,
-      "probability_a": 0.1805,
-      "probability_draw": 0.2124,
-      "probability_b": 0.607,
-      "advance_probability_a": 0.2899,
-      "advance_probability_b": 0.7101,
-      "expected_goals_a": 0.364,
-      "expected_goals_b": 2.367,
-      "winner": "Morocco",
-      "winner_advance_probability": 0.7101
+      "team_a": {
+        "team": "Netherlands",
+        "count": 956,
+        "probability": 0.1912
+      },
+      "team_b": {
+        "team": "Brazil",
+        "count": 919,
+        "probability": 0.1838
+      },
+      "winner": {
+        "team": "Brazil",
+        "count": 544,
+        "probability": 0.1088
+      }
     },
     "91": {
       "match_id": 91,
-      "stage": "LAST_16",
-      "team_a": "Brazil",
-      "team_b": "Senegal",
-      "support_a": 2718,
-      "support_b": 1794,
-      "probability_a": 0.3697,
-      "probability_draw": 0.2631,
-      "probability_b": 0.3672,
-      "advance_probability_a": 0.5038,
-      "advance_probability_b": 0.4962,
-      "expected_goals_a": 1.057,
-      "expected_goals_b": 0.982,
-      "winner": "Brazil",
-      "winner_advance_probability": 0.5038
+      "team_a": {
+        "team": "Brazil",
+        "count": 1122,
+        "probability": 0.2244
+      },
+      "team_b": {
+        "team": "Morocco",
+        "count": 1074,
+        "probability": 0.2148
+      },
+      "winner": {
+        "team": "Brazil",
+        "count": 617,
+        "probability": 0.1234
+      }
     },
     "92": {
       "match_id": 92,
-      "stage": "LAST_16",
-      "team_a": "Mexico",
-      "team_b": "England",
-      "support_a": 2481,
-      "support_b": 2422,
-      "probability_a": 0.4376,
-      "probability_draw": 0.2204,
-      "probability_b": 0.342,
-      "advance_probability_a": 0.5384,
-      "advance_probability_b": 0.4616,
-      "expected_goals_a": 1.466,
-      "expected_goals_b": 2.105,
-      "winner": "Mexico",
-      "winner_advance_probability": 0.5384
+      "team_a": {
+        "team": "Mexico",
+        "count": 1302,
+        "probability": 0.2604
+      },
+      "team_b": {
+        "team": "England",
+        "count": 994,
+        "probability": 0.1988
+      },
+      "winner": {
+        "team": "Mexico",
+        "count": 715,
+        "probability": 0.143
+      }
     },
     "93": {
       "match_id": 93,
-      "stage": "LAST_16",
-      "team_a": "Croatia",
-      "team_b": "Spain",
-      "support_a": 1736,
-      "support_b": 2877,
-      "probability_a": 0.3397,
-      "probability_draw": 0.2173,
-      "probability_b": 0.443,
-      "advance_probability_a": 0.4449,
-      "advance_probability_b": 0.5551,
-      "expected_goals_a": 0.781,
-      "expected_goals_b": 1.812,
-      "winner": "Spain",
-      "winner_advance_probability": 0.5551
+      "team_a": {
+        "team": "Spain",
+        "count": 1225,
+        "probability": 0.245
+      },
+      "team_b": {
+        "team": "Uruguay",
+        "count": 867,
+        "probability": 0.1734
+      },
+      "winner": {
+        "team": "Spain",
+        "count": 726,
+        "probability": 0.1452
+      }
     },
     "94": {
       "match_id": 94,
-      "stage": "LAST_16",
-      "team_a": "Turkey",
-      "team_b": "Belgium",
-      "support_a": 1701,
-      "support_b": 2494,
-      "probability_a": 0.3121,
-      "probability_draw": 0.2302,
-      "probability_b": 0.4577,
-      "advance_probability_a": 0.427,
-      "advance_probability_b": 0.573,
-      "expected_goals_a": 1.244,
-      "expected_goals_b": 1.266,
-      "winner": "Belgium",
-      "winner_advance_probability": 0.573
+      "team_a": {
+        "team": "Belgium",
+        "count": 1142,
+        "probability": 0.2284
+      },
+      "team_b": {
+        "team": "Turkey",
+        "count": 828,
+        "probability": 0.1656
+      },
+      "winner": {
+        "team": "Belgium",
+        "count": 687,
+        "probability": 0.1374
+      }
     },
     "95": {
       "match_id": 95,
-      "stage": "LAST_16",
-      "team_a": "Argentina",
-      "team_b": "Australia",
-      "support_a": 2769,
-      "support_b": 1517,
-      "probability_a": 0.4597,
-      "probability_draw": 0.2187,
-      "probability_b": 0.3216,
-      "advance_probability_a": 0.5793,
-      "advance_probability_b": 0.4207,
-      "expected_goals_a": 2.052,
-      "expected_goals_b": 0.487,
-      "winner": "Argentina",
-      "winner_advance_probability": 0.5793
+      "team_a": {
+        "team": "Argentina",
+        "count": 1168,
+        "probability": 0.2336
+      },
+      "team_b": {
+        "team": "Spain",
+        "count": 809,
+        "probability": 0.1618
+      },
+      "winner": {
+        "team": "Argentina",
+        "count": 722,
+        "probability": 0.1444
+      }
     },
     "96": {
       "match_id": 96,
-      "stage": "LAST_16",
-      "team_a": "Switzerland",
-      "team_b": "Colombia",
-      "support_a": 1832,
-      "support_b": 2407,
-      "probability_a": 0.3357,
-      "probability_draw": 0.2563,
-      "probability_b": 0.4081,
-      "advance_probability_a": 0.4608,
-      "advance_probability_b": 0.5392,
-      "expected_goals_a": 0.784,
-      "expected_goals_b": 1.12,
-      "winner": "Colombia",
-      "winner_advance_probability": 0.5392
+      "team_a": {
+        "team": "Portugal",
+        "count": 1042,
+        "probability": 0.2084
+      },
+      "team_b": {
+        "team": "Canada",
+        "count": 853,
+        "probability": 0.1706
+      },
+      "winner": {
+        "team": "Portugal",
+        "count": 622,
+        "probability": 0.1244
+      }
     },
     "97": {
       "match_id": 97,
-      "stage": "QUARTER_FINALS",
-      "team_a": "France",
-      "team_b": "Morocco",
-      "support_a": 1852,
-      "support_b": 1474,
-      "probability_a": 0.448,
-      "probability_draw": 0.2962,
-      "probability_b": 0.2558,
-      "advance_probability_a": 0.6018,
-      "advance_probability_b": 0.3982,
-      "expected_goals_a": 1.113,
-      "expected_goals_b": 0.972,
-      "winner": "France",
-      "winner_advance_probability": 0.6018
+      "team_a": {
+        "team": "Netherlands",
+        "count": 728,
+        "probability": 0.1456
+      },
+      "team_b": {
+        "team": "France",
+        "count": 715,
+        "probability": 0.143
+      },
+      "winner": {
+        "team": "France",
+        "count": 438,
+        "probability": 0.0876
+      }
     },
     "98": {
       "match_id": 98,
-      "stage": "QUARTER_FINALS",
-      "team_a": "Spain",
-      "team_b": "Belgium",
-      "support_a": 1844,
-      "support_b": 1469,
-      "probability_a": 0.3581,
-      "probability_draw": 0.2322,
-      "probability_b": 0.4097,
-      "advance_probability_a": 0.4756,
-      "advance_probability_b": 0.5244,
-      "expected_goals_a": 0.983,
-      "expected_goals_b": 1.036,
-      "winner": "Belgium",
-      "winner_advance_probability": 0.5244
+      "team_a": {
+        "team": "Spain",
+        "count": 788,
+        "probability": 0.1576
+      },
+      "team_b": {
+        "team": "Belgium",
+        "count": 687,
+        "probability": 0.1374
+      },
+      "winner": {
+        "team": "Spain",
+        "count": 431,
+        "probability": 0.0862
+      }
     },
     "99": {
       "match_id": 99,
-      "stage": "QUARTER_FINALS",
-      "team_a": "Brazil",
-      "team_b": "Mexico",
-      "support_a": 1683,
-      "support_b": 1404,
-      "probability_a": 0.399,
-      "probability_draw": 0.2436,
-      "probability_b": 0.3574,
-      "advance_probability_a": 0.5301,
-      "advance_probability_b": 0.4699,
-      "expected_goals_a": 0.79,
-      "expected_goals_b": 1.697,
-      "winner": "Brazil",
-      "winner_advance_probability": 0.5301
+      "team_a": {
+        "team": "Mexico",
+        "count": 715,
+        "probability": 0.143
+      },
+      "team_b": {
+        "team": "Brazil",
+        "count": 694,
+        "probability": 0.1388
+      },
+      "winner": {
+        "team": "Brazil",
+        "count": 396,
+        "probability": 0.0792
+      }
     },
     "100": {
       "match_id": 100,
-      "stage": "QUARTER_FINALS",
-      "team_a": "Argentina",
-      "team_b": "Colombia",
-      "support_a": 2038,
-      "support_b": 1470,
-      "probability_a": 0.4296,
-      "probability_draw": 0.2269,
-      "probability_b": 0.3435,
-      "advance_probability_a": 0.5465,
-      "advance_probability_b": 0.4535,
-      "expected_goals_a": 1.625,
-      "expected_goals_b": 1.251,
-      "winner": "Argentina",
-      "winner_advance_probability": 0.5465
+      "team_a": {
+        "team": "Argentina",
+        "count": 858,
+        "probability": 0.1716
+      },
+      "team_b": {
+        "team": "Portugal",
+        "count": 622,
+        "probability": 0.1244
+      },
+      "winner": {
+        "team": "Argentina",
+        "count": 454,
+        "probability": 0.0908
+      }
     },
     "101": {
       "match_id": 101,
-      "stage": "SEMI_FINALS",
-      "team_a": "France",
-      "team_b": "Belgium",
-      "support_a": 1256,
-      "support_b": 849,
-      "probability_a": 0.5546,
-      "probability_draw": 0.2129,
-      "probability_b": 0.2325,
-      "advance_probability_a": 0.6618,
-      "advance_probability_b": 0.3382,
-      "expected_goals_a": 2.261,
-      "expected_goals_b": 0.728,
-      "winner": "France",
-      "winner_advance_probability": 0.6618
+      "team_a": {
+        "team": "France",
+        "count": 487,
+        "probability": 0.0974
+      },
+      "team_b": {
+        "team": "Spain",
+        "count": 460,
+        "probability": 0.092
+      },
+      "winner": {
+        "team": "France",
+        "count": 314,
+        "probability": 0.0628
+      }
     },
     "102": {
       "match_id": 102,
-      "stage": "SEMI_FINALS",
-      "team_a": "Brazil",
-      "team_b": "Argentina",
-      "support_a": 958,
-      "support_b": 1284,
-      "probability_a": 0.4088,
-      "probability_draw": 0.2191,
-      "probability_b": 0.372,
-      "advance_probability_a": 0.5176,
-      "advance_probability_b": 0.4824,
-      "expected_goals_a": 2.085,
-      "expected_goals_b": 1.497,
-      "winner": "Brazil",
-      "winner_advance_probability": 0.5176
+      "team_a": {
+        "team": "Argentina",
+        "count": 458,
+        "probability": 0.0916
+      },
+      "team_b": {
+        "team": "Portugal",
+        "count": 456,
+        "probability": 0.0912
+      },
+      "winner": {
+        "team": "France",
+        "count": 278,
+        "probability": 0.0556
+      }
     },
     "103": {
       "match_id": 103,
-      "stage": "FINAL",
-      "team_a": "France",
-      "team_b": "Brazil",
-      "support_a": 1363,
-      "support_b": 1039,
-      "probability_a": 0.4796,
-      "probability_draw": 0.2398,
-      "probability_b": 0.2805,
-      "advance_probability_a": 0.6004,
-      "advance_probability_b": 0.3996,
-      "expected_goals_a": 1.254,
-      "expected_goals_b": 1.31,
-      "winner": "France",
-      "winner_advance_probability": 0.6004
+      "team_a": {
+        "team": "France",
+        "count": 592,
+        "probability": 0.1184
+      },
+      "team_b": {
+        "team": "Spain",
+        "count": 450,
+        "probability": 0.09
+      },
+      "winner": {
+        "team": "France",
+        "count": 382,
+        "probability": 0.0764
+      }
+    },
+    "104": {
+      "match_id": 104,
+      "team_a": {
+        "team": "Spain",
+        "count": 379,
+        "probability": 0.0758
+      },
+      "team_b": {
+        "team": "Brazil",
+        "count": 350,
+        "probability": 0.07
+      },
+      "winner": {
+        "team": "Spain",
+        "count": 227,
+        "probability": 0.0454
+      }
     }
   },
   "image_path": "docs\\assets\\worldcup_2026_premundial_bracket.png"
