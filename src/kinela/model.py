@@ -17,7 +17,7 @@ from kinela.fifa_ranking import (
     update_live_fifa_points,
 )
 
-DETAIL_STAT_FEATURES = [
+CORE_DETAIL_STAT_FEATURES = [
     "shots_on_goal",
     "shots_off_goal",
     "total_shots",
@@ -37,6 +37,14 @@ DETAIL_STAT_FEATURES = [
     "expected_goals",
     "goals_prevented",
 ]
+ESPN_LEADER_DETAIL_FEATURES = [
+    "espn_top_xg",
+    "espn_keeper_xg_conceded",
+    "espn_top_duels_won",
+    "espn_top_big_chances_created",
+    "espn_top_big_chances_missed",
+]
+DETAIL_STAT_FEATURES = [*CORE_DETAIL_STAT_FEATURES, *ESPN_LEADER_DETAIL_FEATURES]
 MIN_TRAINING_DATE = date(2023, 1, 1)
 BASE_ELO = 1500.0
 H2H_LOOKBACK_DAYS = 730
@@ -231,8 +239,8 @@ def _load_worldcup_manual_result_rows(data_root: Path) -> list[dict[str, Any]]:
             "matchday": "1" if row["stage"] == "GROUP_STAGE" else "",
             "home_goals": str(home_goals),
             "away_goals": str(away_goals),
-            "home_penalty_goals": None,
-            "away_penalty_goals": None,
+            "home_penalty_goals": _optional_int(row.get("team_a_penalty_goals")),
+            "away_penalty_goals": _optional_int(row.get("team_b_penalty_goals")),
             "result": result,
             "notes": row.get("notes", ""),
         }

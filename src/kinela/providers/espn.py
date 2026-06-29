@@ -55,7 +55,17 @@ ESPN_STRATEGIC_STATS = {
     "totalClearance": "total_clearances",
 }
 
-STRATEGIC_FIELDS = list(ESPN_STRATEGIC_STATS.values())
+ESPN_LEADER_STRATEGIC_STATS = {
+    "expectedGoals": "espn_top_xg",
+    "expectedGoalsConceded": "espn_keeper_xg_conceded",
+    "duelsWon": "espn_top_duels_won",
+    "bigChanceCreated": "espn_top_big_chances_created",
+    "bigChanceMissed": "espn_top_big_chances_missed",
+}
+
+STRATEGIC_FIELDS = list(
+    dict.fromkeys([*ESPN_STRATEGIC_STATS.values(), *ESPN_LEADER_STRATEGIC_STATS.values()])
+)
 
 
 def normalize_team_name(value: str) -> str:
@@ -93,6 +103,7 @@ def extract_strategic_team_rows(
 ) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     resolved_event_id = event_id or str(summary_payload.get("header", {}).get("id", ""))
+    leader_stats = extract_leader_team_stats(summary_payload)
     for team_block in summary_payload.get("boxscore", {}).get("teams", []):
         team = team_block.get("team", {}).get("displayName", "")
         if not team:
@@ -107,8 +118,33 @@ def extract_strategic_team_rows(
             field = ESPN_STRATEGIC_STATS.get(stat.get("name", ""))
             if field:
                 row[field] = _display_value(stat)
+        row.update(leader_stats.get(normalize_team_name(team), {}))
         row.update(derived_strategic_signals(row))
         rows.append(row)
+    return rows
+
+
+def extract_leader_team_stats(summary_payload: dict[str, Any]) -> dict[str, dict[str, str]]:
+    rows: dict[str, dict[str, str]] = {}
+    for group in summary_payload.get("leaders") or []:
+        team = (group.get("team") or {}).get("displayName", "")
+        team_key = normalize_team_name(team)
+        if not team_key:
+            continue
+        row = rows.setdefault(
+            team_key,
+            {field: "" for field in ESPN_LEADER_STRATEGIC_STATS.values()},
+        )
+        for leader_category in group.get("leaders") or []:
+            for entry in leader_category.get("leaders") or []:
+                for stat in entry.get("statistics") or []:
+                    field = ESPN_LEADER_STRATEGIC_STATS.get(stat.get("name", ""))
+                    if not field:
+                        continue
+                    value = _float_or_none(_display_value(stat))
+                    current = _float_or_none(row.get(field, ""))
+                    if value is not None and (current is None or value > current):
+                        row[field] = _display_value(stat)
     return rows
 
 

@@ -1,0 +1,120 @@
+{
+  "source": "outputs\\worldcup_2026_top4_5000_2026-06-29.csv",
+  "runs": 5000,
+  "seed": 42,
+  "generated_at": "2026-06-29",
+  "top_rows": [
+    {
+      "team": "Brazil",
+      "champion": 0.1482,
+      "runner_up": 0.1546,
+      "third": 0.0716,
+      "fourth": 0.05,
+      "semifinal": 0.4244
+    },
+    {
+      "team": "France",
+      "champion": 0.1536,
+      "runner_up": 0.0832,
+      "third": 0.0978,
+      "fourth": 0.0502,
+      "semifinal": 0.3848
+    },
+    {
+      "team": "Argentina",
+      "champion": 0.097,
+      "runner_up": 0.0886,
+      "third": 0.1044,
+      "fourth": 0.0786,
+      "semifinal": 0.3686
+    },
+    {
+      "team": "England",
+      "champion": 0.0842,
+      "runner_up": 0.069,
+      "third": 0.058,
+      "fourth": 0.0384,
+      "semifinal": 0.2496
+    },
+    {
+      "team": "Spain",
+      "champion": 0.072,
+      "runner_up": 0.0554,
+      "third": 0.0694,
+      "fourth": 0.0412,
+      "semifinal": 0.238
+    },
+    {
+      "team": "Colombia",
+      "champion": 0.0384,
+      "runner_up": 0.0528,
+      "third": 0.069,
+      "fourth": 0.0676,
+      "semifinal": 0.2278
+    },
+    {
+      "team": "Morocco",
+      "champion": 0.0578,
+      "runner_up": 0.0624,
+      "third": 0.0504,
+      "fourth": 0.0482,
+      "semifinal": 0.2188
+    },
+    {
+      "team": "Portugal",
+      "champion": 0.067,
+      "runner_up": 0.04,
+      "third": 0.0556,
+      "fourth": 0.0376,
+      "semifinal": 0.2002
+    },
+    {
+      "team": "Belgium",
+      "champion": 0.0322,
+      "runner_up": 0.0344,
+      "third": 0.0388,
+      "fourth": 0.04,
+      "semifinal": 0.1454
+    },
+    {
+      "team": "United States",
+      "champion": 0.0314,
+      "runner_up": 0.0392,
+      "third": 0.0358,
+      "fourth": 0.0388,
+      "semifinal": 0.1452
+    },
+    {
+      "team": "Senegal",
+      "champion": 0.0368,
+      "runner_up": 0.0326,
+      "third": 0.0314,
+      "fourth": 0.0244,
+      "semifinal": 0.1252
+    },
+    {
+      "team": "Canada",
+      "champion": 0.0162,
+      "runner_up": 0.0276,
+      "third": 0.0304,
+      "fourth": 0.0502,
+      "semifinal": 0.1244
+    },
+    {
+      "team": "Netherlands",
+      "champion": 0.0268,
+      "runner_up": 0.0246,
+      "third": 0.0318,
+      "fourth": 0.0378,
+      "semifinal": 0.121
+    },
+    {
+      "team": "Mexico",
+      "champion": 0.0204,
+      "runner_up": 0.0292,
+      "third": 0.0292,
+      "fourth": 0.034,
+      "semifinal": 0.1128
+    }
+  ]
+}

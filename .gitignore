@@ -30,8 +30,10 @@ scripts/*
 !scripts/audit_worldcup2026_manual_detail_coverage.py
 !scripts/predict_next4_with_all_played_worldcup.py
 !scripts/run_worldcup2026_top4_simulation.py
+!scripts/run_worldcup2026_consensus_bracket.py
 !scripts/run_premundial_bracket_simulation.py
 !scripts/update_worldcup2026_manual_detail_from_espn.py
 !scripts/update_worldcup2026_manual_detail_from_thescore.py
 !scripts/generate_model_evaluation_report.py
 !scripts/worldcup2026_model_metrics.py
+!scripts/worldcup2026_espn_detail_walkforward.py

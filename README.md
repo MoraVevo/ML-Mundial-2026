@@ -1,15 +1,27 @@
 # ML Mundial 2026
 
 Modelo de machine learning para prediccion de partidos del Mundial 2026, con
-65.38% de accuracy en test aleatorio temporal y 56.67% de accuracy sobre 60
+67.31% de accuracy en test aleatorio temporal y 60.00% de accuracy sobre 75
 partidos ya disputados del Mundial. El proyecto destaca por lograr poder
 predictivo con datos limitados, controles anti-leakage y una receta parsimoniosa
 de 12 variables prepartido.
 
 | Evaluacion | Accuracy | Correctos | Partidos | Lectura rapida |
 |---|---:|---:|---:|---|
-| Test aleatorio temporal | 65.38% | 68/104 | 104 | Generalizacion en partidos oficiales recientes no vistos |
-| Test Mundial 2026 | 56.67% | 34/60 | 60 | Rendimiento sobre partidos reales ya jugados del Mundial |
+| Test aleatorio temporal | 67.31% | 70/104 | 104 | Generalizacion en partidos oficiales recientes no vistos |
+| Test Mundial 2026 | 60.00% | 45/75 | 75 | Rendimiento sobre partidos reales ya jugados del Mundial |
+| Test combinado objetivo | 63.69% | 114/179 | 179 | Mundial 2026 jugado mas partidos oficiales recientes |
+
+## Pronostico visual del torneo
+
+Con los resultados conocidos al 29 de junio de 2026, incluyendo Canada sobre
+Sudafrica, Brasil sobre Japon y Paraguay avanzando ante Alemania por penales, el
+modelo simula el resto del torneo y resume las probabilidades de terminar
+primero, segundo, tercero o cuarto. La grafica usa 5,000 simulaciones con el
+modelo `neutral_worldcup_v1_all_played_wc2026`, asignacion exacta de mejores
+terceros y cache de contexto congelado para estabilidad operativa.
+
+![Probabilidades top 4 del Mundial 2026](docs/assets/worldcup_2026_top4_probabilities.png)
 
 ## Bracket premundial
 
@@ -127,7 +139,8 @@ analisis de error e importancia de features esta en
 ## Modelo
 
 El modelo de produccion usa variables prepartido de ranking, forma reciente,
-balance de goles, contexto de fase y compatibilidad tactica.
+balance de goles, contexto de fase, compatibilidad tactica, memoria mundialista
+reciente y ventaja de finalizador diferencial.
 
 La evaluacion principal reporta accuracy sobre partidos ya jugados del Mundial
 2026. Esos partidos se separan como test y no se usan para entrenar el modelo

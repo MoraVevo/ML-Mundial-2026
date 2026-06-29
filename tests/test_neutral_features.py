@@ -44,8 +44,9 @@ def test_rating_threat_uses_historical_pre_match_ranking() -> None:
         treated.loc[0, "live_fifa_anchor_edge"]
         - treated.loc[0, "historical_fifa_anchor_edge"]
     )
-    assert "rating_drift_abs" in NEUTRAL_FEATURES
+    assert "rating_drift_abs" not in NEUTRAL_FEATURES
     assert "rating_drift_edge" not in NEUTRAL_FEATURES
+    assert "worldcup_points_memory_edge" in NEUTRAL_FEATURES
 
 
 def test_recent_points_form_is_direct_and_quality_form_remains_contextual() -> None:
@@ -259,3 +260,82 @@ def test_clinical_finishing_targets_opponent_low_block() -> None:
         0.75 * (0.6 * 0.8 - (-0.2 * 0.1)),
         rel_tol=1e-12,
     )
+
+
+def test_club_star_finisher_edge_is_active_without_total_attack_duplicate() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "team_a_club_star_finisher_signal": 0.65,
+                "team_b_club_star_finisher_signal": 0.20,
+            }
+        ]
+    )
+
+    treated = add_neutral_treated_features(frame)
+
+    assert math.isclose(
+        treated.loc[0, "club_star_finisher_edge"],
+        0.45,
+        rel_tol=1e-12,
+    )
+    assert "club_star_finisher_edge" in NEUTRAL_FEATURES
+    assert "club_attack_talent_edge" not in NEUTRAL_FEATURES
+
+
+def test_worldcup_detail_flow_edge_uses_espn_leader_coverage_gate() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "team_a_espn_leader_detail_coverage": 1.0,
+                "team_b_espn_leader_detail_coverage": 1.0,
+                "team_a_recent6_espn_top_xg": 1.1,
+                "team_b_recent6_espn_top_xg": 0.2,
+                "team_a_recent6_espn_top_big_chances_created": 1.0,
+                "team_b_recent6_espn_top_big_chances_created": 0.0,
+                "team_a_recent6_espn_top_big_chances_missed": 0.0,
+                "team_b_recent6_espn_top_big_chances_missed": 0.0,
+                "team_a_recent6_espn_top_duels_won": 7.0,
+                "team_b_recent6_espn_top_duels_won": 3.0,
+                "team_a_recent6_espn_keeper_xg_conceded": 0.4,
+                "team_b_recent6_espn_keeper_xg_conceded": 1.4,
+                "team_a_recent6_shots_on_goal": 5.0,
+                "team_b_recent6_shots_on_goal": 2.0,
+                "team_a_recent6_passes_accurate": 560.0,
+                "team_b_recent6_passes_accurate": 300.0,
+                "team_a_recent6_passes_pct": 88.0,
+                "team_b_recent6_passes_pct": 73.0,
+                "team_a_recent6_ball_possession_pct": 60.0,
+                "team_b_recent6_ball_possession_pct": 42.0,
+                "team_a_recent6_goalkeeper_saves": 1.0,
+                "team_b_recent6_goalkeeper_saves": 4.0,
+                "team_a_recent6_fouls": 9.0,
+                "team_b_recent6_fouls": 15.0,
+            }
+        ]
+    )
+
+    treated = add_neutral_treated_features(frame)
+
+    assert treated.loc[0, "espn_leader_detail_coverage_pair"] == 1.0
+    assert treated.loc[0, "worldcup_chance_quality_edge"] > 0.0
+    assert treated.loc[0, "worldcup_detail_flow_edge"] > 0.0
+    assert "worldcup_detail_flow_edge" not in NEUTRAL_FEATURES
+
+
+def test_worldcup_detail_flow_edge_is_zero_without_pair_coverage() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "team_a_espn_leader_detail_coverage": 1.0,
+                "team_b_espn_leader_detail_coverage": 0.0,
+                "team_a_recent6_espn_top_xg": 2.0,
+                "team_b_recent6_espn_top_xg": 0.0,
+            }
+        ]
+    )
+
+    treated = add_neutral_treated_features(frame)
+
+    assert treated.loc[0, "espn_leader_detail_coverage_pair"] == 0.0
+    assert treated.loc[0, "worldcup_detail_flow_edge"] == 0.0

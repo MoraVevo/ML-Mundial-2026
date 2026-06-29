@@ -62,12 +62,93 @@ def test_extract_strategic_team_rows_includes_tactical_stats_and_signals() -> No
             "interceptions": "5",
             "clearances_effective": "",
             "total_clearances": "27",
+            "espn_top_xg": "",
+            "espn_keeper_xg_conceded": "",
+            "espn_top_duels_won": "",
+            "espn_top_big_chances_created": "",
+            "espn_top_big_chances_missed": "",
             "low_block_profile_score": "0.768",
             "direct_play_share": "0.161",
             "clearances_per_30pct_opp_possession": "10.743",
             "shot_on_goal_rate": "0.250",
         }
     ]
+
+
+def test_extract_strategic_team_rows_adds_espn_leader_stats_as_top_values() -> None:
+    payload = {
+        "header": {"id": "760414"},
+        "boxscore": {
+            "teams": [
+                {
+                    "team": {"displayName": "South Korea"},
+                    "statistics": [{"name": "shotsOnTarget", "displayValue": "6"}],
+                }
+            ]
+        },
+        "leaders": [
+            {
+                "team": {"displayName": "South Korea"},
+                "leaders": [
+                    {
+                        "name": "totalShots",
+                        "leaders": [
+                            {
+                                "athlete": {"displayName": "Son Heung-Min"},
+                                "statistics": [
+                                    {"name": "expectedGoals", "displayValue": "1.01", "value": 1.014}
+                                ],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "accuratePasses",
+                        "leaders": [
+                            {
+                                "athlete": {"displayName": "Hwang In-Beom"},
+                                "statistics": [
+                                    {"name": "bigChanceCreated", "displayValue": "1", "value": 1.0}
+                                ],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "defensiveInterventions",
+                        "leaders": [
+                            {
+                                "athlete": {"displayName": "Lee Gi-Hyuk"},
+                                "statistics": [
+                                    {"name": "duelsWon", "displayValue": "5", "value": 5.0}
+                                ],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "saves",
+                        "leaders": [
+                            {
+                                "athlete": {"displayName": "Kim Seung-Gyu"},
+                                "statistics": [
+                                    {
+                                        "name": "expectedGoalsConceded",
+                                        "displayValue": "0.83",
+                                        "value": 0.825,
+                                    }
+                                ],
+                            }
+                        ],
+                    },
+                ],
+            }
+        ],
+    }
+
+    row = extract_strategic_team_rows(payload, match_id="537326")[0]
+
+    assert row["espn_top_xg"] == "1.01"
+    assert row["espn_top_big_chances_created"] == "1"
+    assert row["espn_top_duels_won"] == "5"
+    assert row["espn_keeper_xg_conceded"] == "0.83"
 
 
 def test_coverage_by_field_counts_non_empty_values() -> None:

@@ -30,7 +30,9 @@ from kinela.club_attacking_talent import (
 from kinela.fifa_ranking import normalise_team_name
 from kinela.model import (
     BASE_ELO,
+    CORE_DETAIL_STAT_FEATURES,
     DETAIL_STAT_FEATURES,
+    ESPN_LEADER_DETAIL_FEATURES,
     RECENT_FORM_WINDOW,
     _infer_group_keys,
     _load_match_rows,
@@ -224,6 +226,9 @@ NEUTRAL_NUMERIC_FEATURES = [
     "recent6_fouls_diff",
     "recent6_yellow_cards_diff",
     "recent6_physical_coverage",
+    "team_a_espn_leader_detail_coverage",
+    "team_b_espn_leader_detail_coverage",
+    "espn_leader_detail_coverage_pair",
 ]
 # Detailed API-Football stats are kept in the curated matrix, but excluded from
 # model features until coverage is broad enough. Sparse tactical stats were
@@ -298,10 +303,10 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "draw_pressure_index",
     "score_control_value_edge",
     "rating_guardrail_edge",
-    "rating_drift_abs",
     "match_script_compatibility_edge",
     "clinical_low_block_matchup_edge",
-    "club_attack_talent_edge",
+    "club_star_finisher_edge",
+    "worldcup_points_memory_edge",
 ]
 NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v1"
 NEUTRAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
@@ -338,6 +343,10 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "match_script_quality_state_edge",
     "match_script_quality_adjusted_edge",
     "recent_points_form_edge",
+    "rating_drift_abs",
+    "group_state_edge",
+    "group_pressure_index",
+    "group_pressure_edge",
     "counter_current_threat_edge",
     "clinical_low_block_matchup_edge",
     "attacking_personnel_edge",
@@ -345,7 +354,10 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "attack_core_edge",
     "personnel_coverage_pair",
     "club_attack_talent_edge",
+    "club_star_finisher_edge",
     "club_talent_coverage_pair",
+    "worldcup_chance_quality_edge",
+    "worldcup_detail_flow_edge",
 ]
 NEUTRAL_EXPORT_FEATURES = list(
     dict.fromkeys([*NEUTRAL_BASE_FEATURES, *NEUTRAL_FEATURES, *NEUTRAL_CANDIDATE_FEATURES])
@@ -1013,6 +1025,74 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
         - _num_series(out, "team_b_clinical_finishing")
         * _num_series(out, "team_a_low_block_profile_aligned")
     )
+    a_leader_coverage = _num_series(
+        out,
+        "team_a_espn_leader_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    b_leader_coverage = _num_series(
+        out,
+        "team_b_espn_leader_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    leader_pair_coverage = pd.concat([a_leader_coverage, b_leader_coverage], axis=1).min(axis=1)
+    out["espn_leader_detail_coverage_pair"] = leader_pair_coverage
+
+    def side_worldcup_detail(prefix: str) -> dict[str, pd.Series]:
+        top_xg = _num_series(out, f"team_{prefix}_recent6_espn_top_xg")
+        keeper_xgc = _num_series(out, f"team_{prefix}_recent6_espn_keeper_xg_conceded")
+        top_duels = _num_series(out, f"team_{prefix}_recent6_espn_top_duels_won")
+        big_created = _num_series(out, f"team_{prefix}_recent6_espn_top_big_chances_created")
+        big_missed = _num_series(out, f"team_{prefix}_recent6_espn_top_big_chances_missed")
+        shots_on_goal = _num_series(out, f"team_{prefix}_recent6_shots_on_goal")
+        passes_accurate = _num_series(out, f"team_{prefix}_recent6_passes_accurate")
+        passes_pct = _num_series(out, f"team_{prefix}_recent6_passes_pct")
+        possession = _num_series(out, f"team_{prefix}_recent6_ball_possession_pct")
+        saves = _num_series(out, f"team_{prefix}_recent6_goalkeeper_saves")
+        fouls = _num_series(out, f"team_{prefix}_recent6_fouls")
+
+        chance_balance = (big_created - big_missed).clip(lower=0.0)
+        chance_quality = (
+            0.50 * np.tanh(top_xg / 1.15)
+            + 0.22 * np.tanh(chance_balance / 1.40)
+            + 0.28 * np.tanh(shots_on_goal / 4.20)
+        )
+        control = (
+            0.45 * np.tanh(passes_accurate / 560.0)
+            + 0.35 * np.tanh((passes_pct - 74.0).clip(lower=0.0) / 18.0)
+            + 0.20 * np.tanh(possession / 58.0)
+        )
+        duel_grip = np.tanh(top_duels / 8.0)
+        defensive_stress = (
+            0.44 * np.tanh(saves / 3.75)
+            + 0.36 * np.tanh(keeper_xgc / 1.45)
+            + 0.20 * np.tanh(fouls / 16.0)
+        )
+        return {
+            "chance_quality": chance_quality,
+            "control": control,
+            "duel_grip": duel_grip,
+            "defensive_stress": defensive_stress,
+        }
+
+    a_worldcup_detail = side_worldcup_detail("a")
+    b_worldcup_detail = side_worldcup_detail("b")
+    out["worldcup_chance_quality_edge"] = leader_pair_coverage * (
+        a_worldcup_detail["chance_quality"] - b_worldcup_detail["chance_quality"]
+    )
+    out["worldcup_detail_flow_edge"] = leader_pair_coverage * (
+        0.58
+        * (a_worldcup_detail["chance_quality"] - b_worldcup_detail["chance_quality"])
+        + 0.18 * (a_worldcup_detail["control"] - b_worldcup_detail["control"])
+        + 0.14 * (a_worldcup_detail["duel_grip"] - b_worldcup_detail["duel_grip"])
+        + 0.10
+        * (
+            b_worldcup_detail["defensive_stress"]
+            - a_worldcup_detail["defensive_stress"]
+        )
+    ).clip(lower=-1.0, upper=1.0)
+    out["club_star_finisher_edge"] = _num_series(
+        out,
+        "team_a_club_star_finisher_signal",
+    ) - _num_series(out, "team_b_club_star_finisher_signal")
     return out
 
 
@@ -1808,9 +1888,14 @@ def _build_neutral_frame(frame: pd.DataFrame, *, augment: bool) -> pd.DataFrame:
             },
             "detail_coverage": sum(
                 int(has_value(row.get(f"{prefix}_recent6_{feature}_avg")))
-                for feature in DETAIL_STAT_FEATURES
+                for feature in CORE_DETAIL_STAT_FEATURES
             )
-            / len(DETAIL_STAT_FEATURES),
+            / len(CORE_DETAIL_STAT_FEATURES),
+            "espn_leader_detail_coverage": sum(
+                int(has_value(row.get(f"{prefix}_recent6_{feature}_avg")))
+                for feature in ESPN_LEADER_DETAIL_FEATURES
+            )
+            / len(ESPN_LEADER_DETAIL_FEATURES),
         }
 
     records: list[dict[str, Any]] = []
@@ -2162,6 +2247,12 @@ def _build_neutral_frame(frame: pd.DataFrame, *, augment: bool) -> pd.DataFrame:
                     "recent6_physical_coverage": physical_coverage,
                     "team_a_tactical_detail_coverage": a["detail_coverage"],
                     "team_b_tactical_detail_coverage": b["detail_coverage"],
+                    "team_a_espn_leader_detail_coverage": a["espn_leader_detail_coverage"],
+                    "team_b_espn_leader_detail_coverage": b["espn_leader_detail_coverage"],
+                    "espn_leader_detail_coverage_pair": min(
+                        num(a["espn_leader_detail_coverage"]),
+                        num(b["espn_leader_detail_coverage"]),
+                    ),
                     "team_a_fifa_rank": a["team_fifa_rank"],
                     "team_b_fifa_rank": b["team_fifa_rank"],
                     "fifa_rank_diff": num(a["team_fifa_rank"]) - num(b["team_fifa_rank"]),

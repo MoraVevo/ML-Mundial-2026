@@ -653,11 +653,20 @@ class WorldCup2026Simulator:
             team_a_goals = int(row["team_a_goals"])
             team_b_goals = int(row["team_b_goals"])
             winner = row.get("winner") or None
+            team_a_penalty_goals = row.get("team_a_penalty_goals") or None
+            team_b_penalty_goals = row.get("team_b_penalty_goals") or None
             results[match_id] = {
                 **row,
                 "team_a_goals": team_a_goals,
                 "team_b_goals": team_b_goals,
                 "winner": winner,
+                "team_a_penalty_goals": (
+                    int(team_a_penalty_goals) if team_a_penalty_goals is not None else None
+                ),
+                "team_b_penalty_goals": (
+                    int(team_b_penalty_goals) if team_b_penalty_goals is not None else None
+                ),
+                "penalty_winner": row.get("penalty_winner") or None,
             }
         return results
     def _load_squad_quality(self) -> dict[str, dict[str, float]]:
@@ -1497,6 +1506,8 @@ class WorldCup2026Simulator:
             "team_b_club_attack_coverage": b["club_attack_coverage"],
             "club_attack_talent_edge": float(a["club_attack_talent_signal"])
             - float(b["club_attack_talent_signal"]),
+            "club_star_finisher_edge": float(a["club_star_finisher_signal"])
+            - float(b["club_star_finisher_signal"]),
             "club_talent_coverage_pair": min(
                 float(a["club_attack_coverage"]),
                 float(b["club_attack_coverage"]),
@@ -1889,8 +1900,19 @@ class WorldCup2026Simulator:
             a_goals = int(manual_result["team_a_goals"])
             b_goals = int(manual_result["team_b_goals"])
             winner = manual_result["winner"]
+            decided_by = "manual_result"
+            penalty_winner = manual_result.get("penalty_winner")
+            penalty_probability_a = None
             if not winner:
                 winner = team_a if a_goals > b_goals else team_b if b_goals > a_goals else None
+            if (
+                winner == "Draw"
+                and stage != "GROUP_STAGE"
+                and penalty_winner in {team_a, team_b}
+            ):
+                winner = penalty_winner
+                decided_by = "manual_penalties"
+                penalty_probability_a = self.penalty_model.team_a_probability(team_a, team_b, match_date)
             self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
             self._record_match_trace(
                 match_id,
@@ -1901,7 +1923,9 @@ class WorldCup2026Simulator:
                 a_goals,
                 b_goals,
                 winner,
-                decided_by="manual_result",
+                decided_by=decided_by,
+                penalty_winner=penalty_winner if decided_by == "manual_penalties" else None,
+                penalty_team_a_probability=penalty_probability_a,
             )
             return a_goals, b_goals, winner
         if self.engine == "lightgbm" and self.lightgbm_model is not None:

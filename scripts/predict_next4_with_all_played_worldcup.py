@@ -39,6 +39,24 @@ from kinela.worldcup_2026 import (  # noqa: E402
 
 DEFAULT_OUTPUT = Path("outputs/next4_all_played_worldcup_2026-06-23.json")
 MODEL_OUTPUT = Path("data/models/lightgbm_neutral_all_played_wc2026.joblib")
+KNOCKOUT_FIXTURES = [
+    {"fixture_id": 73, "utc_date": "2026-06-28T19:00:00Z", "stage": "ROUND_OF_32", "team_a": "South Africa", "team_b": "Canada"},
+    {"fixture_id": 74, "utc_date": "2026-06-29T20:00:00Z", "stage": "ROUND_OF_32", "team_a": "Germany", "team_b": "Paraguay"},
+    {"fixture_id": 75, "utc_date": "2026-06-29T22:00:00Z", "stage": "ROUND_OF_32", "team_a": "Netherlands", "team_b": "Morocco"},
+    {"fixture_id": 76, "utc_date": "2026-06-29T17:00:00Z", "stage": "ROUND_OF_32", "team_a": "Brazil", "team_b": "Japan"},
+    {"fixture_id": 77, "utc_date": "2026-06-30T19:00:00Z", "stage": "ROUND_OF_32", "team_a": "France", "team_b": "Sweden"},
+    {"fixture_id": 78, "utc_date": "2026-06-30T22:00:00Z", "stage": "ROUND_OF_32", "team_a": "Ivory Coast", "team_b": "Norway"},
+    {"fixture_id": 79, "utc_date": "2026-06-30T23:00:00Z", "stage": "ROUND_OF_32", "team_a": "Mexico", "team_b": "Ecuador"},
+    {"fixture_id": 80, "utc_date": "2026-07-01T19:00:00Z", "stage": "ROUND_OF_32", "team_a": "England", "team_b": "Congo DR"},
+    {"fixture_id": 81, "utc_date": "2026-07-01T22:00:00Z", "stage": "ROUND_OF_32", "team_a": "United States", "team_b": "Bosnia-Herzegovina"},
+    {"fixture_id": 82, "utc_date": "2026-07-01T23:00:00Z", "stage": "ROUND_OF_32", "team_a": "Belgium", "team_b": "Senegal"},
+    {"fixture_id": 83, "utc_date": "2026-07-02T19:00:00Z", "stage": "ROUND_OF_32", "team_a": "Portugal", "team_b": "Croatia"},
+    {"fixture_id": 84, "utc_date": "2026-07-02T22:00:00Z", "stage": "ROUND_OF_32", "team_a": "Spain", "team_b": "Austria"},
+    {"fixture_id": 85, "utc_date": "2026-07-02T23:00:00Z", "stage": "ROUND_OF_32", "team_a": "Switzerland", "team_b": "Algeria"},
+    {"fixture_id": 86, "utc_date": "2026-07-03T19:00:00Z", "stage": "ROUND_OF_32", "team_a": "Argentina", "team_b": "Cape Verde Islands"},
+    {"fixture_id": 87, "utc_date": "2026-07-03T22:00:00Z", "stage": "ROUND_OF_32", "team_a": "Colombia", "team_b": "Ghana"},
+    {"fixture_id": 88, "utc_date": "2026-07-03T23:00:00Z", "stage": "ROUND_OF_32", "team_a": "Australia", "team_b": "Egypt"},
+]
 
 
 def _canonical_match_key(row: pd.Series) -> tuple[str, tuple[str, str]]:
@@ -402,6 +420,59 @@ def main() -> None:
         if len(rows) == args.limit:
             break
 
+    if len(rows) < args.limit:
+        for fixture in sorted(KNOCKOUT_FIXTURES, key=lambda item: item["utc_date"]):
+            match_id = str(fixture["fixture_id"])
+            if match_id in played_ids:
+                continue
+            team_a = fixture["team_a"]
+            team_b = fixture["team_b"]
+            match_date = date.fromisoformat(fixture["utc_date"][:10])
+            prediction = simulator.lightgbm_prediction(
+                team_a,
+                team_b,
+                match_date,
+                fixture["stage"],
+                None,
+            )
+            probabilities = prediction["probabilities"]
+            penalty_probability_a = simulator.penalty_model.team_a_probability(
+                team_a,
+                team_b,
+                match_date,
+            )
+            probability_a = float(probabilities[0])
+            probability_draw = float(probabilities[1])
+            probability_b = float(probabilities[2])
+            probability_advance_a = probability_a + probability_draw * penalty_probability_a
+            probability_advance_b = probability_b + probability_draw * (1 - penalty_probability_a)
+            labels = [team_a, "Empate", team_b]
+            rows.append(
+                {
+                    "fixture_id": int(match_id),
+                    "utc_date": fixture["utc_date"],
+                    "group": "",
+                    "stage": fixture["stage"],
+                    "team_a": team_a,
+                    "team_b": team_b,
+                    "expected_goals_a": round(float(prediction["team_a_goals"]), 3),
+                    "expected_goals_b": round(float(prediction["team_b_goals"]), 3),
+                    "prob_team_a": round(probability_a, 4),
+                    "prob_draw": round(probability_draw, 4),
+                    "prob_team_b": round(probability_b, 4),
+                    "prob_team_a_penalties_if_draw": round(float(penalty_probability_a), 4),
+                    "prob_team_b_penalties_if_draw": round(float(1 - penalty_probability_a), 4),
+                    "prob_team_a_advance": round(float(probability_advance_a), 4),
+                    "prob_team_b_advance": round(float(probability_advance_b), 4),
+                    "most_likely": labels[int(np.argmax(probabilities))],
+                    "most_likely_to_advance": team_a if probability_advance_a >= probability_advance_b else team_b,
+                }
+            )
+            cvs[team_a] = _team_cv(simulator, team_a, team_b, match_date)
+            cvs[team_b] = _team_cv(simulator, team_b, team_a, match_date)
+            if len(rows) == args.limit:
+                break
+
     coverage_path = Path("outputs/worldcup2026_manual_detail_coverage_audit.json")
     coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
     payload = {
@@ -419,6 +490,8 @@ def main() -> None:
         "notes": [
             "CV means the recent team profile used to contextualize the prediction.",
             "Unsupported provider fields remain blank and are not fabricated.",
+            "Knockout rows include advancement probabilities that add draw probability "
+            "times the penalty-shootout model.",
             "This all-played model is for future predictions; official World Cup accuracy "
             "continues to use the held-out 2026 matches.",
         ],

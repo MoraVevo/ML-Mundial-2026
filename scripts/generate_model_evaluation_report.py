@@ -183,6 +183,32 @@ def _split_external_random_temporal(
     }
 
 
+def _split_combined_objective(
+    training: pd.DataFrame,
+    clean: pd.DataFrame,
+    worldcup_split: pd.DataFrame,
+    external_split: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    split = clean.copy()
+    test_mask = worldcup_split["split"].eq("test") | external_split["split"].eq("test")
+    split["split"] = "excluded"
+    split.loc[test_mask, "split"] = "test"
+    test_dates = pd.to_datetime(training.loc[test_mask, "date"], errors="raise")
+    cutoff = test_dates.min()
+    all_dates = pd.to_datetime(training["date"], errors="raise")
+    split.loc[all_dates.lt(cutoff) & ~test_mask, "split"] = "train"
+    return split, {
+        "test_start": str(test_dates.min().date()),
+        "test_end": str(test_dates.max().date()),
+        "policy": (
+            "Diagnostico combinado del objetivo: todos los partidos jugados del "
+            "Mundial 2026 mas el test externo temporal de partidos oficiales no "
+            "amistosos. El entrenamiento usa solo partidos anteriores a la primera "
+            "fecha seleccionada de test y ningun partido de test entra al entrenamiento."
+        ),
+    }
+
+
 def _prepare_neutral(data_root: Path, training: pd.DataFrame, clean: pd.DataFrame) -> pd.DataFrame:
     enriched = _maybe_add_late85_points_swing(data_root, clean, training)
     enriched = _maybe_add_score_timing(data_root, enriched, training)
@@ -360,8 +386,8 @@ def _bar_label(ax: plt.Axes, values: list[float], fmt: str = "{:.2f}") -> None:
 
 
 def _plot_metrics(results: list[EvaluationResult], asset_dir: Path) -> None:
-    labels = ["WC 2026", "External"]
-    colors = ["#2f6f73", "#b06d3b"]
+    labels = ["WC 2026", "External", "Combinado"][: len(results)]
+    colors = ["#2f6f73", "#b06d3b", "#4f7cac"][: len(results)]
     accuracy = [result.metrics["accuracy"] for result in results]
     logloss = [result.metrics["log_loss"] for result in results]
     mae = [result.metrics["mae_goals_avg"] for result in results]
@@ -439,6 +465,8 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         "match_script_compatibility_edge": "Compatibilidad tactica estimada entre estilos de partido de ambos equipos.",
         "clinical_low_block_matchup_edge": "Cruce entre definicion ofensiva y capacidad/riesgo contra bloques bajos.",
         "club_attack_talent_edge": "Ventaja de talento ofensivo de plantel/club cuando hay cobertura previa suficiente; faltantes reducen cobertura en vez de inventar valor.",
+        "club_star_finisher_edge": "Ventaja del mejor finalizador reciente de club dentro del nucleo usado por la seleccion; prioriza techo goleador sobre promedio de talento.",
+        "worldcup_points_memory_edge": "Memoria ponderada de puntos en los ultimos partidos mundialistas disponibles antes del partido.",
     }
     draw_notes = []
     for result in results:
@@ -499,6 +527,10 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
             "conservador con los empates. En estos tests asigna probabilidad al "
             "empate para calibracion via log loss, pero la clase con mayor probabilidad "
             "casi nunca termina siendo `empate`.",
+            "",
+            "La metrica principal sigue siendo el test Mundial 2026. El test combinado "
+            "se incluye como diagnostico del objetivo mixto, no como reemplazo de la "
+            "lectura mundialista.",
             "",
             "| Evaluacion | Empates reales | Empates predichos como clase principal |",
             "|---|---:|---:|",
@@ -596,7 +628,7 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
             "",
             "Grupos conceptuales:",
             "",
-            "- Fuerza/rating: ranking FIFA, fuerza tipo Elo, guardrails y drift.",
+            "- Fuerza/rating: ranking FIFA, fuerza tipo Elo y guardrails de ranking.",
             "- Forma reciente: puntos ajustados por rival y balance de goles.",
             "- Contexto del partido: tipo de competicion, fase/ronda y presion de empate.",
             "- Perfil tactico/ofensivo: compatibilidad de guion de partido y matchup contra bloque bajo.",
@@ -640,6 +672,12 @@ def main() -> None:
         EXTERNAL_TEST_MATCHES,
         RANDOM_SEED,
     )
+    combined_clean, combined_info = _split_combined_objective(
+        training,
+        clean,
+        wc_clean,
+        external_clean,
+    )
     results = [
         _evaluate(
             "worldcup_2026",
@@ -658,6 +696,14 @@ def main() -> None:
             args.data_root,
             training,
             external_clean,
+        ),
+        _evaluate(
+            "combined_objective",
+            "Test combinado objetivo",
+            combined_info["policy"],
+            args.data_root,
+            training,
+            combined_clean,
         ),
     ]
 

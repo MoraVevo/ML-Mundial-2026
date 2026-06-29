@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import csv
 import re
+import sys
 from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from kinela.model import DETAIL_STAT_FEATURES
 
 
 EVENTS = {
@@ -29,26 +35,7 @@ EVENTS = {
     "537398": 93076,
 }
 
-DETAIL_FIELDS = [
-    "shots_on_goal",
-    "shots_off_goal",
-    "total_shots",
-    "blocked_shots",
-    "shots_inside_box",
-    "shots_outside_box",
-    "fouls",
-    "corner_kicks",
-    "offsides",
-    "ball_possession_pct",
-    "yellow_cards",
-    "red_cards",
-    "goalkeeper_saves",
-    "total_passes",
-    "passes_accurate",
-    "passes_pct",
-    "expected_goals",
-    "goals_prevented",
-]
+DETAIL_FIELDS = list(DETAIL_STAT_FEATURES)
 
 ALIASES = {
     "Korea Republic": "South Korea",

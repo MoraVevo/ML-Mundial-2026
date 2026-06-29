@@ -2,32 +2,39 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from kinela.model import DETAIL_STAT_FEATURES
 from kinela.providers.espn import EspnWorldCupClient, extract_strategic_team_rows
 
 
-DETAIL_FIELDS = [
-    "shots_on_goal",
-    "shots_off_goal",
-    "total_shots",
-    "blocked_shots",
-    "shots_inside_box",
-    "shots_outside_box",
-    "fouls",
-    "corner_kicks",
-    "offsides",
-    "ball_possession_pct",
-    "yellow_cards",
-    "red_cards",
-    "goalkeeper_saves",
-    "total_passes",
-    "passes_accurate",
-    "passes_pct",
-    "expected_goals",
-    "goals_prevented",
+DETAIL_FIELDS = list(DETAIL_STAT_FEATURES)
+
+KNOCKOUT_MATCHES = [
+    {"match_id": "73", "date": "2026-06-28", "stage": "ROUND_OF_32", "team_a": "South Africa", "team_b": "Canada"},
+    {"match_id": "74", "date": "2026-06-29", "stage": "ROUND_OF_32", "team_a": "Germany", "team_b": "Paraguay"},
+    {"match_id": "75", "date": "2026-06-29", "stage": "ROUND_OF_32", "team_a": "Netherlands", "team_b": "Morocco"},
+    {"match_id": "76", "date": "2026-06-29", "stage": "ROUND_OF_32", "team_a": "Brazil", "team_b": "Japan"},
+    {"match_id": "77", "date": "2026-06-30", "stage": "ROUND_OF_32", "team_a": "France", "team_b": "Sweden"},
+    {"match_id": "78", "date": "2026-06-30", "stage": "ROUND_OF_32", "team_a": "Ivory Coast", "team_b": "Norway"},
+    {"match_id": "79", "date": "2026-06-30", "stage": "ROUND_OF_32", "team_a": "Mexico", "team_b": "Ecuador"},
+    {"match_id": "80", "date": "2026-07-01", "stage": "ROUND_OF_32", "team_a": "England", "team_b": "Congo DR"},
+    {"match_id": "81", "date": "2026-07-01", "stage": "ROUND_OF_32", "team_a": "United States", "team_b": "Bosnia-Herzegovina"},
+    {"match_id": "82", "date": "2026-07-01", "stage": "ROUND_OF_32", "team_a": "Belgium", "team_b": "Senegal"},
+    {"match_id": "83", "date": "2026-07-02", "stage": "ROUND_OF_32", "team_a": "Portugal", "team_b": "Croatia"},
+    {"match_id": "84", "date": "2026-07-02", "stage": "ROUND_OF_32", "team_a": "Spain", "team_b": "Austria"},
+    {"match_id": "85", "date": "2026-07-02", "stage": "ROUND_OF_32", "team_a": "Switzerland", "team_b": "Algeria"},
+    {"match_id": "86", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Argentina", "team_b": "Cape Verde Islands"},
+    {"match_id": "87", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Colombia", "team_b": "Ghana"},
+    {"match_id": "88", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Australia", "team_b": "Egypt"},
 ]
 
 ALIASES = {
@@ -98,12 +105,42 @@ def _event_score(event: dict) -> dict[str, int]:
     }
 
 
+def _event_penalty_score(event: dict) -> dict[str, int]:
+    competition = (event.get("competitions") or [{}])[0]
+    scores: dict[str, int] = {}
+    for item in competition.get("competitors", []):
+        team = item.get("team", {}).get("displayName", "")
+        if not team:
+            continue
+        value = item.get("shootoutScore")
+        if value in (None, ""):
+            value = item.get("penaltyScore")
+        if value in (None, ""):
+            continue
+        scores[_norm(team)] = int(value)
+    return scores
+
+
+def _event_winner(event: dict) -> str:
+    competition = (event.get("competitions") or [{}])[0]
+    for item in competition.get("competitors", []):
+        if item.get("winner") is True:
+            return item.get("team", {}).get("displayName", "")
+    return ""
+
+
 def _event_is_complete(event: dict) -> bool:
     competition = (event.get("competitions") or [{}])[0]
     return bool(
         competition.get("status", {}).get("type", {}).get("completed")
         or event.get("status", {}).get("type", {}).get("completed")
     )
+
+
+def _manual_espn_event_id(row: dict[str, str]) -> str:
+    text = f"{row.get('source', '')} {row.get('notes', '')}"
+    match = re.search(r"\bESPN event (\d+)\b", text)
+    return match.group(1) if match else ""
 
 
 def _sync_finished_results(
@@ -193,6 +230,71 @@ def _sync_finished_results(
     return manual_rows, added
 
 
+def _sync_finished_knockout_results(
+    manual_rows: list[dict[str, str]],
+    events: dict[tuple[str, str], dict],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    rows_by_id = {row["match_id"]: row for row in manual_rows}
+    added: list[dict[str, str]] = []
+    for match in KNOCKOUT_MATCHES:
+        match_id = match["match_id"]
+        event = events.get(_team_key(match["team_a"], match["team_b"]))
+        if not event or not _event_is_complete(event):
+            continue
+        espn_score = _event_score(event)
+        goals_a = espn_score.get(_norm(match["team_a"]))
+        goals_b = espn_score.get(_norm(match["team_b"]))
+        if goals_a is None or goals_b is None:
+            continue
+        penalty_score = _event_penalty_score(event)
+        penalty_a = penalty_score.get(_norm(match["team_a"]))
+        penalty_b = penalty_score.get(_norm(match["team_b"]))
+        penalty_winner = _event_winner(event) if penalty_a is not None and penalty_b is not None else ""
+        winner = "Draw"
+        if goals_a > goals_b:
+            winner = match["team_a"]
+        elif goals_b > goals_a:
+            winner = match["team_b"]
+        event_id = str(event.get("id", ""))
+        row = rows_by_id.get(match_id)
+        is_new = row is None
+        if row is None:
+            row = {"match_id": match_id}
+            manual_rows.append(row)
+            rows_by_id[match_id] = row
+        row.update(
+            {
+                "date": match["date"],
+                "stage": match["stage"],
+                "group": "",
+                "team_a": match["team_a"],
+                "team_b": match["team_b"],
+                "team_a_goals": str(goals_a),
+                "team_b_goals": str(goals_b),
+                "winner": winner,
+                "team_a_penalty_goals": "" if penalty_a is None else str(penalty_a),
+                "team_b_penalty_goals": "" if penalty_b is None else str(penalty_b),
+                "penalty_winner": penalty_winner,
+                "source": f"ESPN event {event_id}; elimination bracket metadata",
+                "notes": (
+                    f"Final: {match['team_a']} {goals_a}-{goals_b} {match['team_b']}. "
+                    + (
+                        f"Penalties: {match['team_a']} {penalty_a}-{penalty_b} "
+                        f"{match['team_b']}; {penalty_winner} advanced. "
+                        if penalty_a is not None and penalty_b is not None and penalty_winner
+                        else ""
+                    )
+                    + "ESPN marked the event Full Time; knockout match_id comes from the local World Cup bracket."
+                ),
+            }
+        )
+        if is_new:
+            added.append(row)
+
+    manual_rows.sort(key=lambda row: (row["date"], int(row["match_id"])))
+    return manual_rows, added
+
+
 def _summary_stats(
     client: EspnWorldCupClient,
     event_id: str,
@@ -256,6 +358,8 @@ def main() -> None:
     client = EspnWorldCupClient(data_root)
     events = _scoreboard_index(client, scoreboard_days, refresh_days)
     manual_rows, added_results = _sync_finished_results(manual_rows, schedule, events)
+    manual_rows, added_knockouts = _sync_finished_knockout_results(manual_rows, events)
+    added_results.extend(added_knockouts)
 
     manual_fields = [
         "match_id",
@@ -267,6 +371,9 @@ def main() -> None:
         "team_a_goals",
         "team_b_goals",
         "winner",
+        "team_a_penalty_goals",
+        "team_b_penalty_goals",
+        "penalty_winner",
         "source",
         "notes",
     ]
@@ -280,10 +387,10 @@ def main() -> None:
 
     for manual in manual_rows:
         event = events.get(_team_key(manual["team_a"], manual["team_b"]))
-        if not event:
+        event_id = str(event["id"]) if event else _manual_espn_event_id(manual)
+        if not event_id:
             missing_events.append(manual)
             continue
-        event_id = str(event["id"])
         match_day = date.fromisoformat(manual["date"])
         stats_by_team = _summary_stats(
             client,
