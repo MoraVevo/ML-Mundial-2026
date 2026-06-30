@@ -32,7 +32,7 @@ def _selected_model_path(data_root: Path, engine: str) -> str:
     if engine != "lightgbm":
         return ""
     for path in (
-        data_root / "models" / "lightgbm_neutral_all_played_wc2026.joblib",
+        data_root / "models" / "lightgbm_neutral_worldcup_holdout.joblib",
         data_root / "models" / "lightgbm_neutral_model.joblib",
     ):
         if path.exists():
@@ -111,7 +111,7 @@ def run_consensus_bracket_simulation(
     runs: int,
     seed: int,
     progress_every: int,
-    frozen_context_cache: bool,
+    fast_mode: bool,
     model_path: Path | None,
     model_label: str,
 ) -> dict[str, Any]:
@@ -124,9 +124,9 @@ def run_consensus_bracket_simulation(
     if simulator.lightgbm_model is None:
         raise FileNotFoundError(
             "Missing trained LightGBM model. Run "
-            "`python scripts\\predict_next4_with_all_played_worldcup.py --limit 1` first."
+            "`python scripts\\train_worldcup2026_holdout_model.py` first."
         )
-    if frozen_context_cache:
+    if fast_mode:
         class NoClearPredictionCache(dict):
             def clear(self) -> None:
                 return None
@@ -243,12 +243,11 @@ def run_consensus_bracket_simulation(
             "model_note": "Neutral LightGBM; World Cup simulation uses advancement after penalties in knockouts.",
             "accuracy_reference": "Played World Cup 2026 held-out evaluation used by the project.",
             "third_place_assignment": "exact_495_combination_table",
-            "frozen_context_cache": frozen_context_cache,
-            "frozen_context_cache_note": (
-                "Fast mode: LightGBM matchup/stage predictions are cached without live group-table "
-                "context recomputation inside the simulated tournament."
-                if frozen_context_cache
-                else ""
+            "simulation_mode": "fast_fixed_matchup_probabilities" if fast_mode else "full_context",
+            "simulation_mode_note": (
+                "Fast mode keeps each team-vs-team stage probability fixed across runs."
+                if fast_mode
+                else "Full mode recomputes context inside each simulated tournament."
             ),
             "started_at": started.isoformat(timespec="seconds"),
             "finished_at": datetime.now().isoformat(timespec="seconds"),
@@ -327,7 +326,7 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--progress-every", type=int, default=1)
-    parser.add_argument("--frozen-context-cache", action="store_true")
+    parser.add_argument("--fast", dest="fast_mode", action="store_true")
     parser.add_argument("--model-path", type=Path)
     parser.add_argument("--model-label", default="")
     parser.add_argument("--output", default="")
@@ -344,7 +343,7 @@ def main() -> None:
         runs=args.runs,
         seed=args.seed,
         progress_every=args.progress_every,
-        frozen_context_cache=args.frozen_context_cache,
+        fast_mode=args.fast_mode,
         model_path=args.model_path,
         model_label=args.model_label or ("explicit_model_path" if args.model_path else "default_model_priority"),
     )

@@ -97,7 +97,7 @@ def test_lightgbm_stage_context_uses_training_canonical_labels() -> None:
     assert simulator._stage_context("Quarter-finals")["stage_or_round"] == "QUARTER_FINALS"
 
 
-def test_simulator_prefers_all_played_future_lightgbm_model(tmp_path) -> None:
+def test_simulator_prefers_worldcup_holdout_lightgbm_model(tmp_path) -> None:
     models_dir = tmp_path / "models"
     models_dir.mkdir()
     joblib.dump(
@@ -105,12 +105,12 @@ def test_simulator_prefers_all_played_future_lightgbm_model(tmp_path) -> None:
         models_dir / "lightgbm_neutral_model.joblib",
     )
     joblib.dump(
-        {"model_id": "all-played-future"},
-        models_dir / "lightgbm_neutral_all_played_wc2026.joblib",
+        {"model_id": "worldcup-holdout"},
+        models_dir / "lightgbm_neutral_worldcup_holdout.joblib",
     )
     simulator = WorldCup2026Simulator.__new__(WorldCup2026Simulator)
     simulator.data_root = tmp_path
 
     model = simulator._load_lightgbm_model()
 
-    assert model["model_id"] == "all-played-future"
+    assert model["model_id"] == "worldcup-holdout"

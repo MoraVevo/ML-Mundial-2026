@@ -16,25 +16,14 @@ de 12 variables prepartido.
 
 La grafica principal usa cuatro paneles separados para mostrar las
 probabilidades de terminar primero, segundo, tercero o cuarto. Sale de una
-emulacion completa de 500 simulaciones con un modelo entrenado sin partidos del
+emulacion completa de 1,500 simulaciones con un modelo entrenado sin partidos del
 Mundial 2026, usando los resultados ya conocidos como estado del torneo,
 asignacion exacta de mejores terceros y avance por penales en eliminatorias.
 
 ![Probabilidades top 4 del Mundial 2026](docs/assets/worldcup_2026_top4_probabilities.png)
 
-## Bracket premundial
-
-Antes de incorporar cualquier resultado jugado del Mundial 2026, el modelo
-construye una ruta premundial coherente: fase de grupos, 12 primeros, 12
-segundos, 8 mejores terceros con la tabla exacta de 495 combinaciones,
-dieciseisavos, octavos, cuartos, semifinales y final. La imagen no usa partidos
-disputados del Mundial, excluye 60 filas de historial 2026 y se acompana con el
-top de campeones de 5,000 simulaciones completas como contexto estadistico.
-
-![Bracket premundial generado por el modelo](docs/assets/worldcup_2026_premundial_bracket.png)
-
 Pipeline reproducible para recolectar datos de futbol, construir variables
-prepartido, entrenar el modelo y generar predicciones.
+prepartido, entrenar el modelo y simular el torneo.
 
 El repositorio contiene datos estaticos necesarios para el
 calendario/resultados manuales, scripts operativos y pruebas automatizadas. Los
@@ -80,9 +69,9 @@ El proyecto sigue una sola secuencia de trabajo:
 2. Normalizar las fuentes a tablas consistentes.
 3. Construir el frame de entrenamiento nacional.
 4. Exportar la matriz limpia y la matriz final del modelo.
-5. Entrenar el modelo de Mundial.
+5. Entrenar el modelo holdout del Mundial.
 6. Recalcular metricas y reporte tecnico.
-7. Generar predicciones para los proximos partidos.
+7. Simular el torneo y regenerar el visual publico.
 
 ### 1. Recoleccion
 
@@ -111,7 +100,7 @@ kinela export neutral-training-matrix-national
 ### 4. Entrenamiento
 
 ```powershell
-kinela train lightgbm-neutral
+python scripts\train_worldcup2026_holdout_model.py
 ```
 
 ### 5. Metricas
@@ -121,12 +110,14 @@ python scripts\update_worldcup2026_manual_detail_from_espn.py
 python scripts\update_worldcup2026_manual_detail_from_thescore.py
 python scripts\audit_worldcup2026_manual_detail_coverage.py
 python scripts\worldcup2026_model_metrics.py
+python scripts\generate_model_evaluation_report.py
 ```
 
-### 6. Prediccion
+### 6. Simulacion del torneo
 
 ```powershell
-python scripts\predict_next4_with_all_played_worldcup.py --limit 4
+python scripts\run_worldcup2026_consensus_bracket.py --runs 1500 --seed 42 --progress-every 250 --fast --model-path data\models\lightgbm_neutral_worldcup_holdout.joblib --model-label worldcup_holdout_oos_1500 --output outputs\worldcup2026_consensus_bracket_1500_holdout_oos_2026-06-30.json
+python scripts\generate_worldcup2026_top4_visual.py --input outputs\worldcup2026_consensus_bracket_1500_holdout_oos_2026-06-30.json
 ```
 
 ## Evaluacion del modelo
@@ -143,10 +134,8 @@ reciente y ventaja de finalizador diferencial.
 
 La evaluacion principal reporta accuracy sobre partidos ya jugados del Mundial
 2026. Esos partidos se separan como test y no se usan para entrenar el modelo
-que calcula ese accuracy. Para predicciones futuras, el script
-`predict_next4_with_all_played_worldcup.py` entrena con todos los partidos
-nacionales completados disponibles, incluyendo los resultados ya jugados del
-Mundial.
+que calcula ese accuracy. La simulacion publica usa ese mismo artefacto holdout
+para mantener una lectura out-of-sample clara.
 
 ## Estructura
 

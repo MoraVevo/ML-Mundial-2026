@@ -1,217 +1,258 @@
 {
-  "source": "outputs\\worldcup2026_consensus_bracket_500_holdout_oos_2026-06-29.json",
-  "runs": 500,
+  "source": "outputs\\worldcup2026_consensus_bracket_1500_holdout_oos_2026-06-30.json",
+  "runs": 1500,
   "seed": 42,
-  "model_label": "worldcup_holdout_oos",
+  "model_label": "worldcup_holdout_oos_1500",
   "model_path": "data\\models\\lightgbm_neutral_worldcup_holdout.joblib",
   "model_policy": "worldcup_2026_out_of_sample_holdout",
+  "third_place_assignment": "exact_495_combination_table",
   "top_by_position": {
     "prob_campeon": [
       {
         "team": "France",
-        "probability": 0.162,
-        "count": 81
+        "probability": 0.150667,
+        "count": 226
       },
       {
         "team": "Brazil",
-        "probability": 0.136,
-        "count": 68
+        "probability": 0.148667,
+        "count": 223
       },
       {
         "team": "Argentina",
-        "probability": 0.082,
-        "count": 41
-      },
-      {
-        "team": "Portugal",
-        "probability": 0.076,
-        "count": 38
+        "probability": 0.091333,
+        "count": 137
       },
       {
         "team": "England",
-        "probability": 0.07,
-        "count": 35
+        "probability": 0.086667,
+        "count": 130
+      },
+      {
+        "team": "Portugal",
+        "probability": 0.067333,
+        "count": 101
       },
       {
         "team": "Spain",
-        "probability": 0.068,
-        "count": 34
+        "probability": 0.054,
+        "count": 81
       },
       {
         "team": "Senegal",
-        "probability": 0.058,
-        "count": 29
-      },
-      {
-        "team": "Colombia",
-        "probability": 0.048,
-        "count": 24
-      },
-      {
-        "team": "United States",
-        "probability": 0.042,
-        "count": 21
+        "probability": 0.048667,
+        "count": 73
       },
       {
         "team": "Morocco",
-        "probability": 0.032,
-        "count": 16
+        "probability": 0.040667,
+        "count": 61
+      },
+      {
+        "team": "Colombia",
+        "probability": 0.037333,
+        "count": 56
+      },
+      {
+        "team": "United States",
+        "probability": 0.037333,
+        "count": 56
+      },
+      {
+        "team": "Belgium",
+        "probability": 0.027333,
+        "count": 41
+      },
+      {
+        "team": "Netherlands",
+        "probability": 0.027333,
+        "count": 41
       }
     ],
     "prob_segundo": [
       {
         "team": "Brazil",
-        "probability": 0.14,
-        "count": 70
+        "probability": 0.124667,
+        "count": 187
       },
       {
         "team": "Argentina",
-        "probability": 0.096,
-        "count": 48
+        "probability": 0.086,
+        "count": 129
       },
       {
         "team": "France",
-        "probability": 0.076,
-        "count": 38
+        "probability": 0.078667,
+        "count": 118
       },
       {
         "team": "England",
-        "probability": 0.06,
-        "count": 30
-      },
-      {
-        "team": "Colombia",
-        "probability": 0.052,
-        "count": 26
-      },
-      {
-        "team": "Senegal",
-        "probability": 0.05,
-        "count": 25
+        "probability": 0.064,
+        "count": 96
       },
       {
         "team": "Morocco",
-        "probability": 0.05,
-        "count": 25
+        "probability": 0.054,
+        "count": 81
+      },
+      {
+        "team": "Senegal",
+        "probability": 0.053333,
+        "count": 80
+      },
+      {
+        "team": "Colombia",
+        "probability": 0.050667,
+        "count": 76
       },
       {
         "team": "Portugal",
-        "probability": 0.048,
-        "count": 24
+        "probability": 0.043333,
+        "count": 65
       },
       {
-        "team": "Mexico",
-        "probability": 0.044,
-        "count": 22
+        "team": "United States",
+        "probability": 0.042,
+        "count": 63
       },
       {
-        "team": "Switzerland",
+        "team": "Spain",
         "probability": 0.04,
-        "count": 20
+        "count": 60
+      },
+      {
+        "team": "Norway",
+        "probability": 0.038,
+        "count": 57
+      },
+      {
+        "team": "Canada",
+        "probability": 0.034667,
+        "count": 52
       }
     ],
     "prob_tercero": [
       {
-        "team": "France",
-        "probability": 0.098,
-        "count": 49
-      },
-      {
         "team": "Argentina",
-        "probability": 0.098,
-        "count": 49
+        "probability": 0.103333,
+        "count": 155
       },
       {
-        "team": "Brazil",
-        "probability": 0.068,
-        "count": 34
+        "team": "France",
+        "probability": 0.094667,
+        "count": 142
       },
       {
         "team": "Colombia",
-        "probability": 0.06,
-        "count": 30
+        "probability": 0.066667,
+        "count": 100
       },
       {
-        "team": "England",
-        "probability": 0.054,
-        "count": 27
+        "team": "Brazil",
+        "probability": 0.061333,
+        "count": 92
       },
       {
         "team": "Spain",
-        "probability": 0.054,
-        "count": 27
+        "probability": 0.054667,
+        "count": 82
       },
       {
         "team": "Morocco",
-        "probability": 0.052,
-        "count": 26
+        "probability": 0.054667,
+        "count": 82
       },
       {
-        "team": "Netherlands",
-        "probability": 0.052,
-        "count": 26
+        "team": "Portugal",
+        "probability": 0.050667,
+        "count": 76
       },
       {
-        "team": "United States",
-        "probability": 0.048,
-        "count": 24
+        "team": "England",
+        "probability": 0.045333,
+        "count": 68
       },
       {
         "team": "Canada",
-        "probability": 0.048,
-        "count": 24
+        "probability": 0.043333,
+        "count": 65
+      },
+      {
+        "team": "Netherlands",
+        "probability": 0.042667,
+        "count": 64
+      },
+      {
+        "team": "Croatia",
+        "probability": 0.041333,
+        "count": 62
+      },
+      {
+        "team": "United States",
+        "probability": 0.040667,
+        "count": 61
       }
     ],
     "prob_cuarto": [
       {
         "team": "Argentina",
-        "probability": 0.08,
-        "count": 40
+        "probability": 0.078667,
+        "count": 118
       },
       {
         "team": "Colombia",
-        "probability": 0.06,
-        "count": 30
-      },
-      {
-        "team": "France",
-        "probability": 0.054,
-        "count": 27
+        "probability": 0.064667,
+        "count": 97
       },
       {
         "team": "Switzerland",
-        "probability": 0.052,
-        "count": 26
+        "probability": 0.062,
+        "count": 93
       },
       {
-        "team": "Egypt",
+        "team": "France",
         "probability": 0.046,
-        "count": 23
+        "count": 69
       },
       {
         "team": "Brazil",
-        "probability": 0.044,
-        "count": 22
+        "probability": 0.046,
+        "count": 69
       },
       {
-        "team": "Canada",
-        "probability": 0.044,
-        "count": 22
-      },
-      {
-        "team": "Portugal",
-        "probability": 0.042,
-        "count": 21
-      },
-      {
-        "team": "Spain",
-        "probability": 0.042,
-        "count": 21
+        "team": "Morocco",
+        "probability": 0.045333,
+        "count": 68
       },
       {
         "team": "United States",
+        "probability": 0.042667,
+        "count": 64
+      },
+      {
+        "team": "Paraguay",
+        "probability": 0.042667,
+        "count": 64
+      },
+      {
+        "team": "Canada",
         "probability": 0.042,
-        "count": 21
+        "count": 63
+      },
+      {
+        "team": "Mexico",
+        "probability": 0.04,
+        "count": 60
+      },
+      {
+        "team": "Egypt",
+        "probability": 0.04,
+        "count": 60
+      },
+      {
+        "team": "Norway",
+        "probability": 0.038667,
+        "count": 58
       }
     ]
   }

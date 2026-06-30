@@ -286,7 +286,7 @@ class WorldCup2026Simulator:
     def _load_lightgbm_model(self) -> dict[str, Any] | None:
         models_dir = self.data_root / "models"
         for path in (
-            models_dir / "lightgbm_neutral_all_played_wc2026.joblib",
+            models_dir / "lightgbm_neutral_worldcup_holdout.joblib",
             models_dir / "lightgbm_neutral_model.joblib",
         ):
             if path.exists():

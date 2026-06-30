@@ -1,7 +1,6 @@
 import pandas as pd
 
 import scripts.generate_model_evaluation_report as report
-import scripts.predict_next4_with_all_played_worldcup as all_played
 import scripts.worldcup2026_model_metrics as model_metrics
 
 
@@ -87,16 +86,3 @@ def test_latest_manual_result_date_uses_manual_file(tmp_path) -> None:
     )
 
     assert model_metrics._latest_manual_result_date(tmp_path) == "2026-06-24"
-
-
-def test_all_played_dedup_preserves_training_order_after_priority_choice() -> None:
-    metadata = pd.DataFrame(
-        [
-            {"canonical_key": ("2026-06-11", ("a", "b")), "priority": 1},
-            {"canonical_key": ("2026-06-12", ("c", "d")), "priority": 0},
-            {"canonical_key": ("2026-06-11", ("a", "b")), "priority": 2},
-            {"canonical_key": ("2026-06-12", ("e", "f")), "priority": 0},
-        ]
-    )
-
-    assert all_played._deduplicated_training_indices(metadata) == [1, 2, 3]
