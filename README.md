@@ -116,8 +116,8 @@ python scripts\generate_model_evaluation_report.py
 ### 6. Simulacion del torneo
 
 ```powershell
-python scripts\run_worldcup2026_consensus_bracket.py --runs 1500 --seed 42 --progress-every 250 --fast --model-path data\models\lightgbm_neutral_worldcup_holdout.joblib --model-label worldcup_holdout_oos_1500 --output outputs\worldcup2026_consensus_bracket_1500_holdout_oos_2026-06-30.json
-python scripts\generate_worldcup2026_top4_visual.py --input outputs\worldcup2026_consensus_bracket_1500_holdout_oos_2026-06-30.json
+python scripts\run_worldcup2026_consensus_bracket.py --runs 1500 --seed 42 --progress-every 50 --model-path data\models\lightgbm_neutral_worldcup_holdout.joblib --model-label worldcup_holdout_oos_full_1500 --output outputs\worldcup2026_consensus_bracket_1500_holdout_oos_full_2026-06-30.json
+python scripts\generate_worldcup2026_top4_visual.py --input outputs\worldcup2026_consensus_bracket_1500_holdout_oos_full_2026-06-30.json
 ```
 
 ## Evaluacion del modelo

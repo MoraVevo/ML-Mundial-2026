@@ -103,13 +103,18 @@ def main() -> None:
     payload = json.loads(args.input.read_text(encoding="utf-8"))
     metadata = payload["metadata"]
     runs = int(metadata["runs"])
+    mode_label = (
+        "FULL CONTEXT"
+        if metadata.get("simulation_mode") == "full_context"
+        else "FAST"
+    )
     top_by_position = render_top4_visual(
         payload,
         args.output,
         title="Mundial 2026: probabilidades Top 4",
         subtitle=(
-            f"{runs:,} simulaciones | modelo holdout out-of-sample | "
-            "mejores terceros exactos | penales en eliminatorias"
+            f"{runs:,} simulaciones | {mode_label} | holdout out-of-sample | "
+            "terceros exactos | penales"
         ),
         limit=args.limit,
     )
@@ -120,6 +125,7 @@ def main() -> None:
         "model_label": metadata.get("model_label", ""),
         "model_path": metadata.get("model_path", ""),
         "model_policy": "worldcup_2026_out_of_sample_holdout",
+        "simulation_mode": metadata.get("simulation_mode", ""),
         "third_place_assignment": metadata.get("third_place_assignment", ""),
         "top_by_position": top_by_position,
     }

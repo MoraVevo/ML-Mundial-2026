@@ -1,10 +1,11 @@
 {
-  "source": "outputs\\worldcup2026_consensus_bracket_1500_holdout_oos_2026-06-30.json",
+  "source": "outputs\\worldcup2026_consensus_bracket_1500_holdout_oos_full_2026-06-30.json",
   "runs": 1500,
   "seed": 42,
-  "model_label": "worldcup_holdout_oos_1500",
+  "model_label": "worldcup_holdout_oos_full_1500",
   "model_path": "data\\models\\lightgbm_neutral_worldcup_holdout.joblib",
   "model_policy": "worldcup_2026_out_of_sample_holdout",
+  "simulation_mode": "full_context",
   "third_place_assignment": "exact_495_combination_table",
   "top_by_position": {
     "prob_campeon": [
