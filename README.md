@@ -14,12 +14,11 @@ de 12 variables prepartido.
 
 ## Pronostico visual del torneo
 
-Con los resultados conocidos al 29 de junio de 2026, incluyendo Canada sobre
-Sudafrica, Brasil sobre Japon y Paraguay avanzando ante Alemania por penales, el
-modelo simula el resto del torneo y resume las probabilidades de terminar
-primero, segundo, tercero o cuarto. La grafica usa 5,000 simulaciones con el
-modelo `neutral_worldcup_v1_all_played_wc2026`, asignacion exacta de mejores
-terceros y cache de contexto congelado para estabilidad operativa.
+La grafica principal usa la emulacion completa de 500 simulaciones que corrimos
+con el modelo `neutral_worldcup_v1_all_played_wc2026`. Resume las
+probabilidades de terminar primero, segundo, tercero o cuarto, usando
+asignacion exacta de mejores terceros, avance por penales en eliminatorias y
+sin cache de contexto congelado.
 
 ![Probabilidades top 4 del Mundial 2026](docs/assets/worldcup_2026_top4_probabilities.png)
 
