@@ -1,124 +1,218 @@
 {
-  "source": "outputs\\worldcup2026_consensus_bracket_500_2026-06-28.json",
+  "source": "outputs\\worldcup2026_consensus_bracket_500_holdout_oos_2026-06-29.json",
   "runs": 500,
   "seed": 42,
-  "engine": "lightgbm",
-  "model_path": "data\\models\\lightgbm_neutral_all_played_wc2026.joblib",
-  "frozen_context_cache": false,
-  "started_at": "2026-06-28T12:13:39",
-  "finished_at": "2026-06-28T13:08:39",
-  "top_rows": [
-    {
-      "team": "Argentina",
-      "champion": 0.12,
-      "runner_up": 0.084,
-      "third": 0.096,
-      "fourth": 0.076,
-      "top4": 0.376
-    },
-    {
-      "team": "France",
-      "champion": 0.148,
-      "runner_up": 0.086,
-      "third": 0.086,
-      "fourth": 0.03,
-      "top4": 0.35
-    },
-    {
-      "team": "Brazil",
-      "champion": 0.106,
-      "runner_up": 0.084,
-      "third": 0.044,
-      "fourth": 0.052,
-      "top4": 0.286
-    },
-    {
-      "team": "England",
-      "champion": 0.088,
-      "runner_up": 0.078,
-      "third": 0.058,
-      "fourth": 0.034,
-      "top4": 0.258
-    },
-    {
-      "team": "Spain",
-      "champion": 0.056,
-      "runner_up": 0.042,
-      "third": 0.072,
-      "fourth": 0.054,
-      "top4": 0.224
-    },
-    {
-      "team": "Colombia",
-      "champion": 0.044,
-      "runner_up": 0.052,
-      "third": 0.062,
-      "fourth": 0.064,
-      "top4": 0.222
-    },
-    {
-      "team": "Germany",
-      "champion": 0.044,
-      "runner_up": 0.068,
-      "third": 0.058,
-      "fourth": 0.05,
-      "top4": 0.22
-    },
-    {
-      "team": "Morocco",
-      "champion": 0.034,
-      "runner_up": 0.064,
-      "third": 0.044,
-      "fourth": 0.036,
-      "top4": 0.178
-    },
-    {
-      "team": "Portugal",
-      "champion": 0.044,
-      "runner_up": 0.026,
-      "third": 0.054,
-      "fourth": 0.042,
-      "top4": 0.166
-    },
-    {
-      "team": "Belgium",
-      "champion": 0.04,
-      "runner_up": 0.042,
-      "third": 0.056,
-      "fourth": 0.024,
-      "top4": 0.162
-    },
-    {
-      "team": "Senegal",
-      "champion": 0.046,
-      "runner_up": 0.036,
-      "third": 0.042,
-      "fourth": 0.032,
-      "top4": 0.156
-    },
-    {
-      "team": "Mexico",
-      "champion": 0.026,
-      "runner_up": 0.046,
-      "third": 0.034,
-      "fourth": 0.044,
-      "top4": 0.15
-    },
-    {
-      "team": "United States",
-      "champion": 0.04,
-      "runner_up": 0.028,
-      "third": 0.032,
-      "fourth": 0.042,
-      "top4": 0.142
-    },
-    {
-      "team": "Norway",
-      "champion": 0.018,
-      "runner_up": 0.034,
-      "third": 0.026,
-      "fourth": 0.04,
-      "top4": 0.118
-    }
-  ]
+  "model_label": "worldcup_holdout_oos",
+  "model_path": "data\\models\\lightgbm_neutral_worldcup_holdout.joblib",
+  "model_policy": "worldcup_2026_out_of_sample_holdout",
+  "top_by_position": {
+    "prob_campeon": [
+      {
+        "team": "France",
+        "probability": 0.162,
+        "count": 81
+      },
+      {
+        "team": "Brazil",
+        "probability": 0.136,
+        "count": 68
+      },
+      {
+        "team": "Argentina",
+        "probability": 0.082,
+        "count": 41
+      },
+      {
+        "team": "Portugal",
+        "probability": 0.076,
+        "count": 38
+      },
+      {
+        "team": "England",
+        "probability": 0.07,
+        "count": 35
+      },
+      {
+        "team": "Spain",
+        "probability": 0.068,
+        "count": 34
+      },
+      {
+        "team": "Senegal",
+        "probability": 0.058,
+        "count": 29
+      },
+      {
+        "team": "Colombia",
+        "probability": 0.048,
+        "count": 24
+      },
+      {
+        "team": "United States",
+        "probability": 0.042,
+        "count": 21
+      },
+      {
+        "team": "Morocco",
+        "probability": 0.032,
+        "count": 16
+      }
+    ],
+    "prob_segundo": [
+      {
+        "team": "Brazil",
+        "probability": 0.14,
+        "count": 70
+      },
+      {
+        "team": "Argentina",
+        "probability": 0.096,
+        "count": 48
+      },
+      {
+        "team": "France",
+        "probability": 0.076,
+        "count": 38
+      },
+      {
+        "team": "England",
+        "probability": 0.06,
+        "count": 30
+      },
+      {
+        "team": "Colombia",
+        "probability": 0.052,
+        "count": 26
+      },
+      {
+        "team": "Senegal",
+        "probability": 0.05,
+        "count": 25
+      },
+      {
+        "team": "Morocco",
+        "probability": 0.05,
+        "count": 25
+      },
+      {
+        "team": "Portugal",
+        "probability": 0.048,
+        "count": 24
+      },
+      {
+        "team": "Mexico",
+        "probability": 0.044,
+        "count": 22
+      },
+      {
+        "team": "Switzerland",
+        "probability": 0.04,
+        "count": 20
+      }
+    ],
+    "prob_tercero": [
+      {
+        "team": "France",
+        "probability": 0.098,
+        "count": 49
+      },
+      {
+        "team": "Argentina",
+        "probability": 0.098,
+        "count": 49
+      },
+      {
+        "team": "Brazil",
+        "probability": 0.068,
+        "count": 34
+      },
+      {
+        "team": "Colombia",
+        "probability": 0.06,
+        "count": 30
+      },
+      {
+        "team": "England",
+        "probability": 0.054,
+        "count": 27
+      },
+      {
+        "team": "Spain",
+        "probability": 0.054,
+        "count": 27
+      },
+      {
+        "team": "Morocco",
+        "probability": 0.052,
+        "count": 26
+      },
+      {
+        "team": "Netherlands",
+        "probability": 0.052,
+        "count": 26
+      },
+      {
+        "team": "United States",
+        "probability": 0.048,
+        "count": 24
+      },
+      {
+        "team": "Canada",
+        "probability": 0.048,
+        "count": 24
+      }
+    ],
+    "prob_cuarto": [
+      {
+        "team": "Argentina",
+        "probability": 0.08,
+        "count": 40
+      },
+      {
+        "team": "Colombia",
+        "probability": 0.06,
+        "count": 30
+      },
+      {
+        "team": "France",
+        "probability": 0.054,
+        "count": 27
+      },
+      {
+        "team": "Switzerland",
+        "probability": 0.052,
+        "count": 26
+      },
+      {
+        "team": "Egypt",
+        "probability": 0.046,
+        "count": 23
+      },
+      {
+        "team": "Brazil",
+        "probability": 0.044,
+        "count": 22
+      },
+      {
+        "team": "Canada",
+        "probability": 0.044,
+        "count": 22
+      },
+      {
+        "team": "Portugal",
+        "probability": 0.042,
+        "count": 21
+      },
+      {
+        "team": "Spain",
+        "probability": 0.042,
+        "count": 21
+      },
+      {
+        "team": "United States",
+        "probability": 0.042,
+        "count": 21
+      }
+    ]
+  }
 }

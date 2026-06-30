@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import joblib
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -110,10 +112,15 @@ def run_consensus_bracket_simulation(
     seed: int,
     progress_every: int,
     frozen_context_cache: bool,
+    model_path: Path | None,
+    model_label: str,
 ) -> dict[str, Any]:
     engine = "lightgbm"
     simulator = WorldCup2026Simulator(data_root, seed=seed, engine=engine)
-    model_path = _selected_model_path(data_root, engine)
+    selected_model_path = str(model_path) if model_path else _selected_model_path(data_root, engine)
+    if model_path:
+        simulator.lightgbm_model = joblib.load(model_path)
+        simulator.prediction_cache.clear()
     if simulator.lightgbm_model is None:
         raise FileNotFoundError(
             "Missing trained LightGBM model. Run "
@@ -231,9 +238,10 @@ def run_consensus_bracket_simulation(
             "runs": runs,
             "seed": seed,
             "engine": engine,
-            "model_path": model_path,
+            "model_path": selected_model_path,
+            "model_label": model_label,
             "model_note": "Neutral LightGBM; World Cup simulation uses advancement after penalties in knockouts.",
-            "accuracy_reference": "61.11% on the played World Cup 2026 held-out evaluation used by the project.",
+            "accuracy_reference": "Played World Cup 2026 held-out evaluation used by the project.",
             "third_place_assignment": "exact_495_combination_table",
             "frozen_context_cache": frozen_context_cache,
             "frozen_context_cache_note": (
@@ -320,6 +328,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--progress-every", type=int, default=1)
     parser.add_argument("--frozen-context-cache", action="store_true")
+    parser.add_argument("--model-path", type=Path)
+    parser.add_argument("--model-label", default="")
     parser.add_argument("--output", default="")
     args = parser.parse_args()
 
@@ -335,6 +345,8 @@ def main() -> None:
         seed=args.seed,
         progress_every=args.progress_every,
         frozen_context_cache=args.frozen_context_cache,
+        model_path=args.model_path,
+        model_label=args.model_label or ("explicit_model_path" if args.model_path else "default_model_priority"),
     )
     paths = _write_outputs(result, output)
     print(json.dumps({**paths, **result["metadata"]}, indent=2, ensure_ascii=False), flush=True)

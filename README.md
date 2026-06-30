@@ -14,11 +14,11 @@ de 12 variables prepartido.
 
 ## Pronostico visual del torneo
 
-La grafica principal usa la emulacion completa de 500 simulaciones que corrimos
-con el modelo `neutral_worldcup_v1_all_played_wc2026`. Resume las
-probabilidades de terminar primero, segundo, tercero o cuarto, usando
-asignacion exacta de mejores terceros, avance por penales en eliminatorias y
-sin cache de contexto congelado.
+La grafica principal usa cuatro paneles separados para mostrar las
+probabilidades de terminar primero, segundo, tercero o cuarto. Sale de una
+emulacion completa de 500 simulaciones con un modelo entrenado sin partidos del
+Mundial 2026, usando los resultados ya conocidos como estado del torneo,
+asignacion exacta de mejores terceros y avance por penales en eliminatorias.
 
 ![Probabilidades top 4 del Mundial 2026](docs/assets/worldcup_2026_top4_probabilities.png)
 
