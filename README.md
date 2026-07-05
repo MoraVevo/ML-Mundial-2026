@@ -61,6 +61,14 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Nueva PC / setup portable
+
+Para mover el estado actual del modelo a otra computadora sin volver a
+recolectar datos, usar el flujo portable documentado en
+[`docs/new_pc_setup.md`](docs/new_pc_setup.md). El repo via GitHub contiene el
+codigo; el ZIP portable via Drive contiene `data/`, modelos entrenados y el
+fixture necesario para simular.
+
 ## Pipeline principal
 
 El proyecto sigue una sola secuencia de trabajo:

@@ -194,10 +194,13 @@ def run_consensus_bracket_simulation(
 
         if progress_every and index % progress_every == 0:
             elapsed = (datetime.now() - started).total_seconds()
+            top3 = " | ".join(
+                f"{team}: {count / index:.1%}"
+                for team, count in champions.most_common(3)
+            )
             print(
-                f"{index}/{runs} simulaciones | campeon={champion} | "
-                f"lider={champions.most_common(1)[0][0]} "
-                f"({champions.most_common(1)[0][1]}/{index}) | {elapsed:.1f}s",
+                f"{index}/{runs} simulaciones | top campeones: {top3} | "
+                f"ultima={champion} | {elapsed:.1f}s",
                 flush=True,
             )
 

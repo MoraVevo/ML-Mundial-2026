@@ -2,6 +2,7 @@ import pandas as pd
 
 import scripts.generate_model_evaluation_report as report
 import scripts.worldcup2026_model_metrics as model_metrics
+import scripts.worldcup2026_out_of_sample_comparison as oos_comparison
 
 
 def test_worldcup_split_uses_only_prior_training_rows() -> None:
@@ -86,3 +87,44 @@ def test_latest_manual_result_date_uses_manual_file(tmp_path) -> None:
     )
 
     assert model_metrics._latest_manual_result_date(tmp_path) == "2026-06-24"
+
+
+def test_walkforward_split_uses_prior_rows_and_target_only() -> None:
+    training = pd.DataFrame(
+        [
+            {
+                "row_index": 10,
+                "date": "2026-06-10",
+                "source": "provider",
+                "competition_name": "World Cup - Qualification Europe",
+            },
+            {
+                "row_index": 11,
+                "date": "2026-06-11",
+                "source": "manual-worldcup-2026",
+                "competition_name": "FIFA World Cup",
+            },
+            {
+                "row_index": 12,
+                "date": "2026-06-12",
+                "source": "manual-worldcup-2026",
+                "competition_name": "FIFA World Cup",
+            },
+            {
+                "row_index": 13,
+                "date": "2026-06-13",
+                "source": "manual-worldcup-2026",
+                "competition_name": "FIFA World Cup",
+            },
+        ]
+    )
+    clean = pd.DataFrame({"split": ["train"] * len(training)})
+
+    split, info = oos_comparison.split_worldcup_2026_walkforward(
+        training,
+        clean,
+        target_index=2,
+    )
+
+    assert split["split"].tolist() == ["train", "train", "test", "excluded"]
+    assert "incluyendo partidos previos del Mundial 2026" in info["policy"]

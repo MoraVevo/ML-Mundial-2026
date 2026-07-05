@@ -21,10 +21,11 @@ from kinela.fouls_model import (
 )
 from kinela.lightgbm_model import export_neutral_training_matrix, train_lightgbm
 from kinela.model import export_clean_training_matrix, export_training_frame
-from kinela.normalize import normalize_statsbomb_world_cup
+from kinela.normalize import normalize_fotmob_world_cups, normalize_statsbomb_world_cup
 from kinela.post_lineup_goals import train_post_lineup_goals, write_post_lineup_goals_matrix
 from kinela.providers.api_football import ApiFootball
 from kinela.providers.football_data import FootballData
+from kinela.providers.fotmob import FotMobWorldCup
 from kinela.providers.statsbomb import StatsBombOpenData
 from kinela.worldcup_2026 import run_worldcup_simulation
 
@@ -119,6 +120,7 @@ def build_parser() -> argparse.ArgumentParser:
             "football-data-bulk",
             "football-data-historical-scorers",
             "football-data-squad-player-matches",
+            "fotmob-world-cups",
             "fifa-ranking",
             "fifa-ranking-history",
         ],
@@ -173,6 +175,7 @@ def build_parser() -> argparse.ArgumentParser:
             "statsbomb-world-cup-2022",
             "api-football",
             "football-data",
+            "fotmob-world-cups",
             "fifa-ranking",
             "fifa-ranking-history",
         ],
@@ -228,6 +231,8 @@ def main() -> None:
                 include_360=not args.without_360,
                 refresh=args.refresh,
             )
+        elif args.source == "fotmob-world-cups":
+            result = FotMobWorldCup(args.data_root).collect_world_cups(refresh=args.refresh)
         elif args.source == "api-football-team":
             if not args.team_id:
                 raise SystemExit("--team-id is required")
@@ -589,6 +594,8 @@ def main() -> None:
     elif args.command == "normalize":
         if args.source == "statsbomb-world-cup-2022":
             result = normalize_statsbomb_world_cup(args.data_root)
+        elif args.source == "fotmob-world-cups":
+            result = normalize_fotmob_world_cups(args.data_root)
         elif args.source == "api-football":
             result = build_api_football_etl(args.data_root)
         elif args.source == "fifa-ranking":

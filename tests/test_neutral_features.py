@@ -339,3 +339,202 @@ def test_worldcup_detail_flow_edge_is_zero_without_pair_coverage() -> None:
 
     assert treated.loc[0, "espn_leader_detail_coverage_pair"] == 0.0
     assert treated.loc[0, "worldcup_detail_flow_edge"] == 0.0
+
+
+def test_fotmob_worldcup_chance_edge_requires_bilateral_coverage() -> None:
+    frame = pd.DataFrame(
+        [
+            {
+                "team_a_recent6_fotmob_detail_coverage": 1.0,
+                "team_b_recent6_fotmob_detail_coverage": 1.0,
+                "team_a_recent6_fotmob_expected_goals": 2.0,
+                "team_a_recent6_fotmob_expected_goals_conceded": 0.7,
+                "team_a_recent6_fotmob_expected_goals_on_target": 1.5,
+                "team_a_recent6_fotmob_big_chances": 4.0,
+                "team_a_recent6_fotmob_big_chances_conceded": 1.0,
+                "team_a_recent6_fotmob_big_chances_missed": 1.0,
+                "team_a_recent6_fotmob_total_shots": 15.0,
+                "team_a_recent6_fotmob_shots_on_target": 6.0,
+                "team_a_recent6_fotmob_touches_opp_box": 35.0,
+                "team_b_recent6_fotmob_expected_goals": 0.8,
+                "team_b_recent6_fotmob_expected_goals_conceded": 1.6,
+                "team_b_recent6_fotmob_expected_goals_on_target": 0.4,
+                "team_b_recent6_fotmob_big_chances": 1.0,
+                "team_b_recent6_fotmob_big_chances_conceded": 4.0,
+                "team_b_recent6_fotmob_big_chances_missed": 3.0,
+                "team_b_recent6_fotmob_total_shots": 7.0,
+                "team_b_recent6_fotmob_shots_on_target": 2.0,
+                "team_b_recent6_fotmob_touches_opp_box": 10.0,
+            },
+            {
+                "team_a_recent6_fotmob_detail_coverage": 1.0,
+                "team_b_recent6_fotmob_detail_coverage": 0.0,
+                "team_a_recent6_fotmob_expected_goals": 2.0,
+                "team_b_recent6_fotmob_expected_goals": 0.0,
+            },
+        ]
+    )
+
+    treated = add_neutral_treated_features(frame)
+
+    assert treated.loc[0, "worldcup_fotmob_chance_coverage_pair"] == 1.0
+    assert treated.loc[0, "worldcup_fotmob_xg_balance_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_chance_pressure_edge"] > 0.0
+    assert treated.loc[1, "worldcup_fotmob_chance_coverage_pair"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_xg_balance_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_chance_pressure_edge"] == 0.0
+    assert "worldcup_fotmob_chance_pressure_edge" not in NEUTRAL_FEATURES
+
+
+def test_interpreted_fotmob_worldcup_edges_require_bilateral_coverage() -> None:
+    def story_columns(side: str, *, strong: bool, coverage: float) -> dict[str, float]:
+        prefix = f"team_{side}_worldcup_recent6"
+        if strong:
+            values = {
+                "fotmob_underlying_threat": 0.78,
+                "fotmob_finishing_signal": 0.22,
+                "fotmob_waste_signal": 0.15,
+                "fotmob_low_possession_punch": 0.52,
+                "fotmob_sterile_control_risk": 0.05,
+                "fotmob_defensive_resistance": 0.70,
+                "fotmob_chance_control_signal": 0.68,
+                "fotmob_unrewarded_pressure": 0.46,
+                "fotmob_clinical_chance_signal": 0.31,
+                "fotmob_expected_goals": 1.9,
+                "fotmob_expected_goals_conceded": 0.7,
+            }
+        else:
+            values = {
+                "fotmob_underlying_threat": 0.32,
+                "fotmob_finishing_signal": -0.18,
+                "fotmob_waste_signal": 0.60,
+                "fotmob_low_possession_punch": 0.10,
+                "fotmob_sterile_control_risk": 0.40,
+                "fotmob_defensive_resistance": 0.25,
+                "fotmob_chance_control_signal": 0.08,
+                "fotmob_unrewarded_pressure": 0.05,
+                "fotmob_clinical_chance_signal": -0.34,
+                "fotmob_expected_goals": 0.7,
+                "fotmob_expected_goals_conceded": 1.8,
+            }
+        return {
+            f"{prefix}_{key}": value
+            for key, value in {
+                "fotmob_detail_coverage": coverage,
+                **values,
+            }.items()
+        }
+
+    frame = pd.DataFrame(
+        [
+            {
+                **story_columns("a", strong=True, coverage=1.0),
+                **story_columns("b", strong=False, coverage=1.0),
+                "team_a_low_block_coverage_aligned": 1.0,
+                "team_b_low_block_coverage_aligned": 1.0,
+                "team_a_low_block_profile_aligned": 0.25,
+                "team_b_low_block_profile_aligned": 0.85,
+            },
+            {
+                **story_columns("a", strong=True, coverage=1.0),
+                **story_columns("b", strong=False, coverage=0.0),
+                "team_a_low_block_coverage_aligned": 1.0,
+                "team_b_low_block_coverage_aligned": 1.0,
+                "team_a_low_block_profile_aligned": 0.25,
+                "team_b_low_block_profile_aligned": 0.85,
+            },
+        ]
+    )
+
+    treated = add_neutral_treated_features(frame)
+
+    assert treated.loc[0, "worldcup_fotmob_low_block_solution_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_transition_punch_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_unrewarded_pressure_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_finishing_discipline_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_interpreted_edge"] > 0.0
+    assert treated.loc[1, "worldcup_fotmob_low_block_solution_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_transition_punch_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_unrewarded_pressure_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_finishing_discipline_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_interpreted_edge"] == 0.0
+    assert "worldcup_fotmob_interpreted_edge" not in NEUTRAL_FEATURES
+
+
+def test_current_worldcup_fotmob_story_requires_bilateral_coverage() -> None:
+    def story_columns(side: str, *, strong: bool, coverage: float) -> dict[str, float]:
+        prefix = f"team_{side}_current_worldcup_recent6"
+        if strong:
+            values = {
+                "fotmob_underlying_threat": 0.72,
+                "fotmob_finishing_signal": 0.18,
+                "fotmob_waste_signal": 0.18,
+                "fotmob_low_possession_punch": 0.45,
+                "fotmob_sterile_control_risk": 0.07,
+                "fotmob_defensive_resistance": 0.66,
+                "fotmob_chance_control_signal": 0.61,
+                "fotmob_unrewarded_pressure": 0.38,
+                "fotmob_clinical_chance_signal": 0.24,
+                "fotmob_expected_goals": 1.7,
+                "fotmob_expected_goals_conceded": 0.8,
+            }
+        else:
+            values = {
+                "fotmob_underlying_threat": 0.29,
+                "fotmob_finishing_signal": -0.12,
+                "fotmob_waste_signal": 0.52,
+                "fotmob_low_possession_punch": 0.08,
+                "fotmob_sterile_control_risk": 0.34,
+                "fotmob_defensive_resistance": 0.31,
+                "fotmob_chance_control_signal": 0.11,
+                "fotmob_unrewarded_pressure": 0.03,
+                "fotmob_clinical_chance_signal": -0.25,
+                "fotmob_expected_goals": 0.6,
+                "fotmob_expected_goals_conceded": 1.5,
+            }
+        return {
+            f"{prefix}_{key}": value
+            for key, value in {
+                "fotmob_detail_coverage": coverage,
+                **values,
+            }.items()
+        }
+
+    frame = pd.DataFrame(
+        [
+            {
+                **story_columns("a", strong=True, coverage=1.0),
+                **story_columns("b", strong=False, coverage=1.0),
+                "team_a_low_block_coverage_aligned": 1.0,
+                "team_b_low_block_coverage_aligned": 1.0,
+                "team_a_low_block_profile_aligned": 0.30,
+                "team_b_low_block_profile_aligned": 0.80,
+            },
+            {
+                **story_columns("a", strong=True, coverage=1.0),
+                **story_columns("b", strong=False, coverage=0.0),
+                "team_a_low_block_coverage_aligned": 1.0,
+                "team_b_low_block_coverage_aligned": 1.0,
+                "team_a_low_block_profile_aligned": 0.30,
+                "team_b_low_block_profile_aligned": 0.80,
+            },
+        ]
+    )
+
+    treated = add_neutral_treated_features(frame)
+
+    assert treated.loc[0, "worldcup_fotmob_current_chance_pressure_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_current_low_block_solution_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_current_transition_punch_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_current_unrewarded_pressure_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_current_story_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_current_story_edge"] == treated.loc[
+        0,
+        "worldcup_fotmob_current_low_block_solution_edge",
+    ]
+    assert treated.loc[1, "worldcup_fotmob_current_chance_pressure_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_current_low_block_solution_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_current_transition_punch_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_current_unrewarded_pressure_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_current_story_edge"] == 0.0
+    assert "worldcup_fotmob_current_story_edge" in NEUTRAL_FEATURES

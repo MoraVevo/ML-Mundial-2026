@@ -34,5 +34,11 @@ scripts/*
 !scripts/update_worldcup2026_manual_detail_from_espn.py
 !scripts/update_worldcup2026_manual_detail_from_thescore.py
 !scripts/generate_model_evaluation_report.py
+!scripts/create_portable_bundle.py
+!scripts/restore_portable_bundle.py
+!scripts/verify_portable_setup.py
+!scripts/train_worldcup2026_all_played_model.py
 !scripts/worldcup2026_model_metrics.py
+!scripts/worldcup2026_out_of_sample_comparison.py
 !scripts/worldcup2026_espn_detail_walkforward.py
+!scripts/run_worldcup2026_fixed_r32_no_results.py

@@ -33,6 +33,7 @@ from kinela.model import (
     CORE_DETAIL_STAT_FEATURES,
     DETAIL_STAT_FEATURES,
     ESPN_LEADER_DETAIL_FEATURES,
+    FOTMOB_WORLD_CUP_DETAIL_FEATURES,
     RECENT_FORM_WINDOW,
     _infer_group_keys,
     _load_match_rows,
@@ -149,6 +150,14 @@ NUMERIC_FEATURES = [
 ]
 for _side in ("home", "away"):
     NUMERIC_FEATURES.extend(f"{_side}_recent6_{_feature}_avg" for _feature in DETAIL_STAT_FEATURES)
+    NUMERIC_FEATURES.extend(
+        f"{_side}_worldcup_recent6_{_feature}_avg"
+        for _feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+    )
+    NUMERIC_FEATURES.extend(
+        f"{_side}_current_worldcup_recent6_{_feature}_avg"
+        for _feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+    )
 
 NEUTRAL_NUMERIC_FEATURES = [
     "competition_train_matches",
@@ -294,6 +303,16 @@ NEUTRAL_HELPER_NUMERIC_FEATURES = [
 NEUTRAL_HELPER_NUMERIC_FEATURES.extend(
     f"team_{side}_recent6_{feature}" for side in ("a", "b") for feature in DETAIL_STAT_FEATURES
 )
+NEUTRAL_HELPER_NUMERIC_FEATURES.extend(
+    f"team_{side}_worldcup_recent6_{feature}"
+    for side in ("a", "b")
+    for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+)
+NEUTRAL_HELPER_NUMERIC_FEATURES.extend(
+    f"team_{side}_current_worldcup_recent6_{feature}"
+    for side in ("a", "b")
+    for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+)
 PARSIMONIOUS_NEUTRAL_FEATURES = [
     "competition_family",
     "stage_or_round",
@@ -301,18 +320,20 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "quality_form_edge",
     "goal_balance_edge",
     "draw_pressure_index",
-    "score_control_value_edge",
+    "quality_score_control_swing_edge",
     "rating_guardrail_edge",
     "match_script_compatibility_edge",
     "clinical_low_block_matchup_edge",
     "club_star_finisher_edge",
     "worldcup_points_memory_edge",
+    "worldcup_fotmob_current_story_edge",
 ]
-NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v1"
+NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v3_fotmob_current_story"
 NEUTRAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
 NEUTRAL_CANDIDATE_FEATURES = [
     "late85_points_swing_edge",
     "score_state_value_edge",
+    "score_control_value_edge",
     "scoring_quickness_edge",
     "score_timing_edge",
     "score_control_quality_edge",
@@ -358,6 +379,19 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "club_talent_coverage_pair",
     "worldcup_chance_quality_edge",
     "worldcup_detail_flow_edge",
+    "worldcup_fotmob_xg_balance_edge",
+    "worldcup_fotmob_chance_pressure_edge",
+    "worldcup_fotmob_chance_coverage_pair",
+    "worldcup_fotmob_interpreted_edge",
+    "worldcup_fotmob_low_block_solution_edge",
+    "worldcup_fotmob_transition_punch_edge",
+    "worldcup_fotmob_unrewarded_pressure_edge",
+    "worldcup_fotmob_finishing_discipline_edge",
+    "worldcup_fotmob_current_chance_pressure_edge",
+    "worldcup_fotmob_current_low_block_solution_edge",
+    "worldcup_fotmob_current_transition_punch_edge",
+    "worldcup_fotmob_current_unrewarded_pressure_edge",
+    "worldcup_fotmob_current_story_edge",
 ]
 NEUTRAL_EXPORT_FEATURES = list(
     dict.fromkeys([*NEUTRAL_BASE_FEATURES, *NEUTRAL_FEATURES, *NEUTRAL_CANDIDATE_FEATURES])
@@ -1089,6 +1123,234 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
             - a_worldcup_detail["defensive_stress"]
         )
     ).clip(lower=-1.0, upper=1.0)
+    a_fotmob_coverage = _num_series(
+        out,
+        "team_a_recent6_fotmob_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    b_fotmob_coverage = _num_series(
+        out,
+        "team_b_recent6_fotmob_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    fotmob_pair_coverage = pd.concat(
+        [a_fotmob_coverage, b_fotmob_coverage],
+        axis=1,
+    ).min(axis=1)
+    out["worldcup_fotmob_chance_coverage_pair"] = fotmob_pair_coverage
+
+    def side_fotmob(prefix: str) -> dict[str, pd.Series]:
+        xg = _num_series(out, f"team_{prefix}_recent6_fotmob_expected_goals")
+        xgc = _num_series(out, f"team_{prefix}_recent6_fotmob_expected_goals_conceded")
+        xgot = _num_series(out, f"team_{prefix}_recent6_fotmob_expected_goals_on_target")
+        big = _num_series(out, f"team_{prefix}_recent6_fotmob_big_chances")
+        big_conceded = _num_series(out, f"team_{prefix}_recent6_fotmob_big_chances_conceded")
+        big_missed = _num_series(out, f"team_{prefix}_recent6_fotmob_big_chances_missed")
+        shots = _num_series(out, f"team_{prefix}_recent6_fotmob_total_shots")
+        sot = _num_series(out, f"team_{prefix}_recent6_fotmob_shots_on_target")
+        touches_box = _num_series(out, f"team_{prefix}_recent6_fotmob_touches_opp_box")
+        creation = (
+            0.46 * np.tanh(xg / 1.65)
+            + 0.22 * np.tanh(big / 3.20)
+            + 0.16 * np.tanh(xgot / 1.55)
+            + 0.10 * np.tanh(sot / 5.20)
+            + 0.06 * np.tanh(touches_box / 26.0)
+        )
+        waste = 0.72 * np.tanh(big_missed / 3.20) + 0.28 * np.tanh(
+            (xg - xgot).clip(lower=0.0) / 1.15
+        )
+        resistance = (
+            0.58 * (1.0 - np.tanh(xgc / 1.75))
+            + 0.24 * (1.0 - np.tanh(big_conceded / 3.20))
+            + 0.18 * (1.0 - np.tanh(shots / 16.0))
+        )
+        return {
+            "xg_balance": xg - xgc,
+            "creation": creation,
+            "waste": waste,
+            "resistance": resistance,
+        }
+
+    a_fotmob = side_fotmob("a")
+    b_fotmob = side_fotmob("b")
+    out["worldcup_fotmob_xg_balance_edge"] = fotmob_pair_coverage * np.tanh(
+        (a_fotmob["xg_balance"] - b_fotmob["xg_balance"]) / 1.80
+    )
+    out["worldcup_fotmob_chance_pressure_edge"] = fotmob_pair_coverage * (
+        0.50 * (a_fotmob["creation"] - b_fotmob["creation"])
+        + 0.24 * (a_fotmob["resistance"] - b_fotmob["resistance"])
+        + 0.26 * (b_fotmob["waste"] - a_fotmob["waste"])
+    ).clip(lower=-1.0, upper=1.0)
+
+    a_wc_fotmob_coverage = _num_series(
+        out,
+        "team_a_worldcup_recent6_fotmob_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    b_wc_fotmob_coverage = _num_series(
+        out,
+        "team_b_worldcup_recent6_fotmob_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    wc_fotmob_pair_coverage = pd.concat(
+        [a_wc_fotmob_coverage, b_wc_fotmob_coverage],
+        axis=1,
+    ).min(axis=1)
+
+    def side_worldcup_fotmob(
+        prefix: str,
+        history_prefix: str = "worldcup",
+    ) -> dict[str, pd.Series]:
+        column_prefix = f"team_{prefix}_{history_prefix}_recent6"
+        underlying = _num_series(out, f"{column_prefix}_fotmob_underlying_threat")
+        finishing = _num_series(out, f"{column_prefix}_fotmob_finishing_signal")
+        waste = _num_series(out, f"{column_prefix}_fotmob_waste_signal")
+        low_possession_punch = _num_series(
+            out,
+            f"{column_prefix}_fotmob_low_possession_punch",
+        )
+        sterile_control = _num_series(
+            out,
+            f"{column_prefix}_fotmob_sterile_control_risk",
+        )
+        resistance = _num_series(
+            out,
+            f"{column_prefix}_fotmob_defensive_resistance",
+        )
+        chance_control = _num_series(
+            out,
+            f"{column_prefix}_fotmob_chance_control_signal",
+        )
+        unrewarded = _num_series(
+            out,
+            f"{column_prefix}_fotmob_unrewarded_pressure",
+        )
+        clinical = _num_series(
+            out,
+            f"{column_prefix}_fotmob_clinical_chance_signal",
+        )
+        xg_balance = _num_series(
+            out,
+            f"{column_prefix}_fotmob_expected_goals",
+        ) - _num_series(out, f"{column_prefix}_fotmob_expected_goals_conceded")
+        return {
+            "underlying": underlying,
+            "finishing": finishing,
+            "waste": waste,
+            "low_possession_punch": low_possession_punch,
+            "sterile_control": sterile_control,
+            "resistance": resistance,
+            "chance_control": chance_control,
+            "unrewarded": unrewarded,
+            "clinical": clinical,
+            "xg_balance": xg_balance,
+        }
+
+    a_wc_fotmob = side_worldcup_fotmob("a")
+    b_wc_fotmob = side_worldcup_fotmob("b")
+    low_block_pair_coverage = pd.concat(
+        [
+            wc_fotmob_pair_coverage,
+            _num_series(out, "team_a_low_block_coverage_aligned").clip(0.0, 1.0),
+            _num_series(out, "team_b_low_block_coverage_aligned").clip(0.0, 1.0),
+        ],
+        axis=1,
+    ).min(axis=1)
+    team_a_low_block = _num_series(out, "team_a_low_block_profile_aligned").clip(
+        0.0,
+        1.0,
+    )
+    team_b_low_block = _num_series(out, "team_b_low_block_profile_aligned").clip(
+        0.0,
+        1.0,
+    )
+    out["worldcup_fotmob_low_block_solution_edge"] = low_block_pair_coverage * (
+        (
+            a_wc_fotmob["underlying"]
+            - 0.55 * a_wc_fotmob["sterile_control"]
+            - 0.18 * a_wc_fotmob["waste"]
+        )
+        * team_b_low_block
+        - (
+            b_wc_fotmob["underlying"]
+            - 0.55 * b_wc_fotmob["sterile_control"]
+            - 0.18 * b_wc_fotmob["waste"]
+        )
+        * team_a_low_block
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_transition_punch_edge"] = wc_fotmob_pair_coverage * (
+        a_wc_fotmob["low_possession_punch"] - b_wc_fotmob["low_possession_punch"]
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_unrewarded_pressure_edge"] = wc_fotmob_pair_coverage * (
+        a_wc_fotmob["unrewarded"] - b_wc_fotmob["unrewarded"]
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_finishing_discipline_edge"] = wc_fotmob_pair_coverage * (
+        a_wc_fotmob["clinical"]
+        - b_wc_fotmob["clinical"]
+        - 0.35 * (a_wc_fotmob["waste"] - b_wc_fotmob["waste"])
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_interpreted_edge"] = (
+        wc_fotmob_pair_coverage
+        * (
+            0.36 * (a_wc_fotmob["chance_control"] - b_wc_fotmob["chance_control"])
+            + 0.20
+            * np.tanh(
+                (a_wc_fotmob["xg_balance"] - b_wc_fotmob["xg_balance"]) / 1.8
+            )
+        )
+        + 0.17 * out["worldcup_fotmob_low_block_solution_edge"]
+        + 0.13 * out["worldcup_fotmob_transition_punch_edge"]
+        + 0.09 * out["worldcup_fotmob_finishing_discipline_edge"]
+        + 0.05 * out["worldcup_fotmob_unrewarded_pressure_edge"]
+    ).clip(lower=-1.0, upper=1.0)
+
+    a_current_wc_coverage = _num_series(
+        out,
+        "team_a_current_worldcup_recent6_fotmob_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    b_current_wc_coverage = _num_series(
+        out,
+        "team_b_current_worldcup_recent6_fotmob_detail_coverage",
+    ).clip(lower=0.0, upper=1.0)
+    current_wc_pair_coverage = pd.concat(
+        [a_current_wc_coverage, b_current_wc_coverage],
+        axis=1,
+    ).min(axis=1)
+    a_current_wc = side_worldcup_fotmob("a", "current_worldcup")
+    b_current_wc = side_worldcup_fotmob("b", "current_worldcup")
+    current_low_block_pair_coverage = pd.concat(
+        [
+            current_wc_pair_coverage,
+            _num_series(out, "team_a_low_block_coverage_aligned").clip(0.0, 1.0),
+            _num_series(out, "team_b_low_block_coverage_aligned").clip(0.0, 1.0),
+        ],
+        axis=1,
+    ).min(axis=1)
+    out["worldcup_fotmob_current_chance_pressure_edge"] = current_wc_pair_coverage * (
+        0.46 * (a_current_wc["chance_control"] - b_current_wc["chance_control"])
+        + 0.22 * np.tanh((a_current_wc["xg_balance"] - b_current_wc["xg_balance"]) / 1.8)
+        + 0.18 * (a_current_wc["clinical"] - b_current_wc["clinical"])
+        + 0.14 * (b_current_wc["waste"] - a_current_wc["waste"])
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_current_low_block_solution_edge"] = current_low_block_pair_coverage * (
+        (
+            a_current_wc["underlying"]
+            - 0.55 * a_current_wc["sterile_control"]
+            - 0.18 * a_current_wc["waste"]
+        )
+        * team_b_low_block
+        - (
+            b_current_wc["underlying"]
+            - 0.55 * b_current_wc["sterile_control"]
+            - 0.18 * b_current_wc["waste"]
+        )
+        * team_a_low_block
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_current_transition_punch_edge"] = current_wc_pair_coverage * (
+        a_current_wc["low_possession_punch"] - b_current_wc["low_possession_punch"]
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_current_unrewarded_pressure_edge"] = current_wc_pair_coverage * (
+        a_current_wc["unrewarded"] - b_current_wc["unrewarded"]
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_current_story_edge"] = out[
+        "worldcup_fotmob_current_low_block_solution_edge"
+    ].clip(lower=-1.0, upper=1.0)
     out["club_star_finisher_edge"] = _num_series(
         out,
         "team_a_club_star_finisher_signal",
@@ -1886,6 +2148,14 @@ def _build_neutral_frame(frame: pd.DataFrame, *, augment: bool) -> pd.DataFrame:
             "detail_stats": {
                 feature: row[f"{prefix}_recent6_{feature}_avg"] for feature in DETAIL_STAT_FEATURES
             },
+            "worldcup_detail_stats": {
+                feature: row[f"{prefix}_worldcup_recent6_{feature}_avg"]
+                for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+            },
+            "current_worldcup_detail_stats": {
+                feature: row[f"{prefix}_current_worldcup_recent6_{feature}_avg"]
+                for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+            },
             "detail_coverage": sum(
                 int(has_value(row.get(f"{prefix}_recent6_{feature}_avg")))
                 for feature in CORE_DETAIL_STAT_FEATURES
@@ -2330,6 +2600,19 @@ def _build_neutral_frame(frame: pd.DataFrame, *, augment: bool) -> pd.DataFrame:
                     records[-1][f"recent6_{feature}_diff"] = (
                         a["detail_stats"][feature] - b["detail_stats"][feature]
                     )
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+                records[-1][f"team_a_worldcup_recent6_{feature}"] = a[
+                    "worldcup_detail_stats"
+                ][feature]
+                records[-1][f"team_b_worldcup_recent6_{feature}"] = b[
+                    "worldcup_detail_stats"
+                ][feature]
+                records[-1][f"team_a_current_worldcup_recent6_{feature}"] = a[
+                    "current_worldcup_detail_stats"
+                ][feature]
+                records[-1][f"team_b_current_worldcup_recent6_{feature}"] = b[
+                    "current_worldcup_detail_stats"
+                ][feature]
     neutral = pd.DataFrame.from_records(records)
     for column in [*NEUTRAL_NUMERIC_FEATURES, *NEUTRAL_HELPER_NUMERIC_FEATURES]:
         neutral[column] = pd.to_numeric(neutral[column], errors="coerce")

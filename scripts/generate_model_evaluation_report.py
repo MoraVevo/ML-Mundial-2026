@@ -460,6 +460,7 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         "goal_balance_edge": "Diferencia de balance goleador reciente e historico: goles a favor menos goles recibidos.",
         "draw_pressure_index": "Indice de paridad y baja separacion esperada; ayuda a calibrar partidos cerrados.",
         "score_control_value_edge": "Ventaja en control de marcador: capacidad reciente de sostener o transformar estados de partido.",
+        "quality_score_control_swing_edge": "Control de marcador ajustado por calidad del rival y cambios tempranos de estado; prioriza senales de resultado sobre marcador exacto.",
         "rating_guardrail_edge": "Correccion de seguridad cuando las senales de amenaza se alejan demasiado del rating base.",
         "rating_drift_abs": "Magnitud del cambio reciente entre rating historico y rating vivo; captura incertidumbre/volatilidad.",
         "match_script_compatibility_edge": "Compatibilidad tactica estimada entre estilos de partido de ambos equipos.",
@@ -467,6 +468,19 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         "club_attack_talent_edge": "Ventaja de talento ofensivo de plantel/club cuando hay cobertura previa suficiente; faltantes reducen cobertura en vez de inventar valor.",
         "club_star_finisher_edge": "Ventaja del mejor finalizador reciente de club dentro del nucleo usado por la seleccion; prioriza techo goleador sobre promedio de talento.",
         "worldcup_points_memory_edge": "Memoria ponderada de puntos en los ultimos partidos mundialistas disponibles antes del partido.",
+        "worldcup_fotmob_xg_balance_edge": "Balance reciente de xG creado menos xG concedido en Mundiales desde FotMob, con cobertura bilateral.",
+        "worldcup_fotmob_chance_pressure_edge": "Presion reciente de ocasiones mundialistas desde FotMob: xG, big chances, desperdicio y resistencia defensiva con compuerta de cobertura.",
+        "worldcup_fotmob_chance_coverage_pair": "Cobertura bilateral de datos FotMob World Cup antes del partido; evita que senales parciales entren como rendimiento real.",
+        "worldcup_fotmob_interpreted_edge": "Sintesis interpretada de dominio de ocasiones mundialistas: control de chance, balance xG, solucion contra bloque bajo, transicion y disciplina de definicion.",
+        "worldcup_fotmob_low_block_solution_edge": "Capacidad mundialista reciente de convertir amenaza en ocasiones utiles contra un rival con perfil de bloque bajo, penalizando posesion esteril y desperdicio.",
+        "worldcup_fotmob_transition_punch_edge": "Peligro reciente con baja posesion: senal de equipos que producen xG, big chances y tiros claros sin necesitar dominar la pelota.",
+        "worldcup_fotmob_unrewarded_pressure_edge": "Presion ofensiva no premiada en el marcador: buenos volumenes de amenaza con empates/derrotas, util para no castigar demasiado un resultado adverso.",
+        "worldcup_fotmob_finishing_discipline_edge": "Calidad de definicion ajustada por desperdicio: diferencia entre convertir lo generado y dejar big chances sin premio.",
+        "worldcup_fotmob_current_chance_pressure_edge": "Lectura del Mundial actual antes del partido: quien viene controlando mejor las ocasiones, xG, definicion y desperdicio dentro del mismo torneo.",
+        "worldcup_fotmob_current_low_block_solution_edge": "Respuesta mostrada en el Mundial actual frente a perfiles de bloque bajo, usando amenaza real y riesgo de control esteril.",
+        "worldcup_fotmob_current_transition_punch_edge": "Peligro de transicion observado en el Mundial actual: generar sin mucha posesion, especialmente util ante rivales que conceden espacio.",
+        "worldcup_fotmob_current_unrewarded_pressure_edge": "Partidos recientes del Mundial actual donde el equipo genero suficiente amenaza aunque el marcador no lo reflejara.",
+        "worldcup_fotmob_current_story_edge": "Lectura conservadora del Mundial actual: capacidad reciente de transformar amenaza real en soluciones contra rivales que pueden defender bajo, evitando la mezcla mas ruidosa de todos los microeventos.",
     }
     draw_notes = []
     for result in results:

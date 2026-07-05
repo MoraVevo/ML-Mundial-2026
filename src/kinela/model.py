@@ -44,7 +44,40 @@ ESPN_LEADER_DETAIL_FEATURES = [
     "espn_top_big_chances_created",
     "espn_top_big_chances_missed",
 ]
-DETAIL_STAT_FEATURES = [*CORE_DETAIL_STAT_FEATURES, *ESPN_LEADER_DETAIL_FEATURES]
+FOTMOB_WORLD_CUP_DETAIL_FEATURES = [
+    "fotmob_expected_goals",
+    "fotmob_expected_goals_conceded",
+    "fotmob_expected_goals_non_penalty",
+    "fotmob_expected_goals_on_target",
+    "fotmob_big_chances",
+    "fotmob_big_chances_conceded",
+    "fotmob_big_chances_missed",
+    "fotmob_total_shots",
+    "fotmob_shots_on_target",
+    "fotmob_shots_inside_box",
+    "fotmob_touches_opp_box",
+    "fotmob_detail_coverage",
+    "fotmob_goal_xg_delta",
+    "fotmob_xgot_xg_delta",
+    "fotmob_xg_per_shot",
+    "fotmob_big_chance_rate",
+    "fotmob_big_chance_conversion",
+    "fotmob_chance_waste_rate",
+    "fotmob_underlying_threat",
+    "fotmob_finishing_signal",
+    "fotmob_waste_signal",
+    "fotmob_low_possession_punch",
+    "fotmob_sterile_control_risk",
+    "fotmob_defensive_resistance",
+    "fotmob_chance_control_signal",
+    "fotmob_unrewarded_pressure",
+    "fotmob_clinical_chance_signal",
+]
+DETAIL_STAT_FEATURES = [
+    *CORE_DETAIL_STAT_FEATURES,
+    *ESPN_LEADER_DETAIL_FEATURES,
+    *FOTMOB_WORLD_CUP_DETAIL_FEATURES,
+]
 MIN_TRAINING_DATE = date(2023, 1, 1)
 BASE_ELO = 1500.0
 H2H_LOOKBACK_DAYS = 730
@@ -251,6 +284,183 @@ def _load_worldcup_manual_result_rows(data_root: Path) -> list[dict[str, Any]]:
                 match_row[f"{side}_actual_{feature}"] = stats.get(feature)
         rows.append(match_row)
     return rows
+
+
+def _load_fotmob_worldcup_detail_stats(
+    data_root: Path,
+) -> dict[tuple[str, str, str], dict[str, float]]:
+    path = data_root / "processed" / "fotmob_world_cup" / "team_match_stats.csv"
+    if not path.exists():
+        return {}
+    by_match: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    for row in csv.DictReader(path.open(encoding="utf-8")):
+        match_id = str(row.get("match_id") or "")
+        team = normalise_team_name(row.get("team") or "")
+        if not match_id or not team:
+            continue
+        by_match[match_id][team] = row
+
+    stats: dict[tuple[str, str, str], dict[str, float]] = {}
+    for teams in by_match.values():
+        if len(teams) < 2:
+            continue
+        for team_key, row in teams.items():
+            opponent_key = normalise_team_name(row.get("opponent") or "")
+            opponent = teams.get(opponent_key, {})
+
+            def value(source: dict[str, Any], field: str) -> float | None:
+                raw = source.get(field)
+                if raw in (None, ""):
+                    return None
+                try:
+                    return float(raw)
+                except (TypeError, ValueError):
+                    return None
+
+            def num(source: dict[str, Any], field: str, fallback: float = 0.0) -> float:
+                raw = value(source, field)
+                return fallback if raw is None else raw
+
+            def ratio(numerator: float, denominator: float, fallback: float = 0.0) -> float:
+                if denominator <= 0:
+                    return fallback
+                return numerator / denominator
+
+            def clip01(raw: float) -> float:
+                return max(0.0, min(1.0, raw))
+
+            own_xg = value(row, "expected_goals")
+            own_big = value(row, "big_chances")
+            goals_for = num(row, "goals_for")
+            goals_against = num(row, "goals_against")
+            xg = num(row, "expected_goals")
+            xgc = num(opponent, "expected_goals")
+            xgot = num(row, "expected_goals_on_target")
+            big = num(row, "big_chances")
+            big_conceded = num(opponent, "big_chances")
+            big_missed = num(row, "big_chances_missed")
+            shots = num(row, "total_shots")
+            shots_on_target = num(row, "shots_on_target")
+            touches_box = num(row, "touches_opp_box")
+            possession = num(row, "possession_pct", 50.0)
+            xg_per_shot = ratio(xg, shots)
+            big_rate = ratio(big, shots)
+            big_conversion = ratio(max(0.0, big - big_missed), big, fallback=0.0)
+            waste_rate = ratio(big_missed, big)
+            goal_xg_delta = goals_for - xg
+            xgot_xg_delta = xgot - xg
+            creation_strength = (
+                0.42 * math.tanh(xg / 1.75)
+                + 0.26 * math.tanh(big / 3.2)
+                + 0.14 * math.tanh(touches_box / 26.0)
+                + 0.10 * math.tanh(shots_on_target / 5.2)
+                + 0.08 * math.tanh(xg_per_shot / 0.14)
+            )
+            finishing_signal = (
+                0.44 * math.tanh(goal_xg_delta / 1.15)
+                + 0.34 * math.tanh(xgot_xg_delta / 0.85)
+                + 0.22 * (2.0 * big_conversion - 1.0)
+            )
+            waste_signal = (
+                0.48 * math.tanh(big_missed / 3.0)
+                + 0.32 * math.tanh(max(0.0, xg - goals_for) / 1.25)
+                + 0.20 * math.tanh(max(0.0, xg - xgot) / 0.85)
+            )
+            low_possession = clip01((48.0 - possession) / 18.0)
+            high_possession = clip01((possession - 55.0) / 22.0)
+            low_possession_punch = low_possession * creation_strength
+            sterile_control_risk = high_possession * (1.0 - creation_strength) * (
+                0.62 + 0.38 * waste_signal
+            )
+            defensive_resistance = (
+                0.58 * (1.0 - math.tanh(xgc / 1.75))
+                + 0.28 * (1.0 - math.tanh(big_conceded / 3.2))
+                + 0.14 * (1.0 - math.tanh(goals_against / 2.0))
+            )
+            chance_control = (
+                0.46 * creation_strength
+                + 0.25 * defensive_resistance
+                + 0.16 * finishing_signal
+                - 0.08 * waste_signal
+                - 0.05 * sterile_control_risk
+            )
+            unrewarded_pressure = float(goals_for <= goals_against) * (
+                0.58 * creation_strength + 0.42 * waste_signal
+            )
+            clinical_chance_signal = 0.62 * finishing_signal - 0.38 * waste_signal
+            values = {
+                "fotmob_expected_goals": own_xg,
+                "fotmob_expected_goals_conceded": value(opponent, "expected_goals"),
+                "fotmob_expected_goals_non_penalty": value(row, "expected_goals_non_penalty"),
+                "fotmob_expected_goals_on_target": value(row, "expected_goals_on_target"),
+                "fotmob_big_chances": own_big,
+                "fotmob_big_chances_conceded": value(opponent, "big_chances"),
+                "fotmob_big_chances_missed": value(row, "big_chances_missed"),
+                "fotmob_total_shots": value(row, "total_shots"),
+                "fotmob_shots_on_target": value(row, "shots_on_target"),
+                "fotmob_shots_inside_box": value(row, "shots_inside_box"),
+                "fotmob_touches_opp_box": value(row, "touches_opp_box"),
+                "fotmob_goal_xg_delta": goal_xg_delta,
+                "fotmob_xgot_xg_delta": xgot_xg_delta,
+                "fotmob_xg_per_shot": xg_per_shot,
+                "fotmob_big_chance_rate": big_rate,
+                "fotmob_big_chance_conversion": big_conversion,
+                "fotmob_chance_waste_rate": waste_rate,
+                "fotmob_underlying_threat": creation_strength,
+                "fotmob_finishing_signal": finishing_signal,
+                "fotmob_waste_signal": waste_signal,
+                "fotmob_low_possession_punch": low_possession_punch,
+                "fotmob_sterile_control_risk": sterile_control_risk,
+                "fotmob_defensive_resistance": defensive_resistance,
+                "fotmob_chance_control_signal": chance_control,
+                "fotmob_unrewarded_pressure": unrewarded_pressure,
+                "fotmob_clinical_chance_signal": clinical_chance_signal,
+            }
+            observed = sum(
+                values[field] is not None
+                for field in (
+                    "fotmob_expected_goals",
+                    "fotmob_expected_goals_conceded",
+                    "fotmob_big_chances",
+                    "fotmob_big_chances_conceded",
+                    "fotmob_big_chances_missed",
+                )
+            )
+            values["fotmob_detail_coverage"] = observed / 5.0
+            clean_values = {
+                key: float(val)
+                for key, val in values.items()
+                if val is not None
+            }
+            date_key = str(row.get("date") or "")
+            opponent_raw = normalise_team_name(row.get("opponent") or "")
+            stats[(date_key, team_key, opponent_raw)] = clean_values
+    return stats
+
+
+def _attach_fotmob_worldcup_detail_stats(
+    data_root: Path,
+    rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    fotmob_stats = _load_fotmob_worldcup_detail_stats(data_root)
+    if not fotmob_stats:
+        return rows
+    enriched: list[dict[str, Any]] = []
+    for row in rows:
+        current = dict(row)
+        if row.get("competition_name") != "FIFA World Cup":
+            enriched.append(current)
+            continue
+        date_key = str(row.get("date") or "")
+        for side, opponent in (("home", "away"), ("away", "home")):
+            team_key = normalise_team_name(str(row.get(f"{side}_team") or ""))
+            opponent_key = normalise_team_name(str(row.get(f"{opponent}_team") or ""))
+            stats = fotmob_stats.get((date_key, team_key, opponent_key), {})
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+                if feature in stats:
+                    current[f"{side}_actual_{feature}"] = stats[feature]
+        enriched.append(current)
+    return enriched
 
 
 def _score_probs(home_lambda: float, away_lambda: float, max_goals: int = 8) -> dict[str, float]:
@@ -687,6 +897,15 @@ def _load_manual_late85_points_swing_metrics(data_root: Path) -> dict[str, dict[
                             "team": {"name": team},
                         }
                     )
+            events = _valid_goal_events(
+                events,
+                home,
+                away,
+                int(row["team_a_goals"]),
+                int(row["team_b_goals"]),
+            )
+            if events is None:
+                continue
             by_match[f"fd:{row['match_id']}"] = late85_points_swing_metrics(events, home, away)
     return by_match
 
@@ -735,6 +954,121 @@ def _load_manual_score_timing_metrics(data_root: Path) -> dict[str, dict[str, di
     return by_match
 
 
+def _espn_event_id(row: dict[str, Any]) -> str | None:
+    text = f"{row.get('source', '')} {row.get('notes', '')}"
+    match = re.search(r"\bESPN event (\d+)\b", text)
+    return match.group(1) if match else None
+
+
+def _espn_goal_minute(play: dict[str, Any]) -> tuple[int, int | None] | None:
+    display = str((play.get("clock") or {}).get("displayValue") or "")
+    match = re.search(r"(\d{1,3})'(?:\+(\d{1,2})')?", display)
+    if match:
+        return int(match.group(1)), int(match.group(2) or 0) or None
+    value = (play.get("clock") or {}).get("value")
+    if value in (None, ""):
+        return None
+    try:
+        minute = int(float(value) // 60)
+    except (TypeError, ValueError):
+        return None
+    return minute, None
+
+
+def _espn_goal_events(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = []
+    for play in summary.get("keyEvents") or []:
+        if play.get("shootout") is True:
+            continue
+        play_type = (play.get("type") or {}).get("type")
+        text = f"{(play.get('type') or {}).get('text', '')} {play.get('text', '')}".casefold()
+        if not (play.get("scoringPlay") is True or play_type == "goal" or "goal!" in text):
+            continue
+        team = (play.get("team") or {}).get("displayName") or ""
+        minute = _espn_goal_minute(play)
+        if not team or minute is None:
+            continue
+        elapsed, extra = minute
+        events.append(
+            {
+                "type": "Goal",
+                "detail": (play.get("type") or {}).get("text"),
+                "comments": "",
+                "time": {"elapsed": elapsed, "extra": extra},
+                "team": {"name": team},
+            }
+        )
+    return events
+
+
+def _load_espn_score_timing_metrics(data_root: Path) -> dict[str, dict[str, dict[str, float]]]:
+    path = data_root / "static" / "worldcup_2026_manual_results.csv"
+    if not path.exists():
+        return {}
+    by_match: dict[str, dict[str, dict[str, float]]] = {}
+    summary_dir = data_root / "raw" / "espn" / "worldcup_2026"
+    with path.open(encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            event_id = _espn_event_id(row)
+            if not event_id:
+                continue
+            summary_path = summary_dir / f"summary_{event_id}.json"
+            if not summary_path.exists():
+                continue
+            try:
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                continue
+            home = row["team_a"]
+            away = row["team_b"]
+            events = _espn_goal_events(summary)
+            valid = _valid_goal_events(
+                events,
+                home,
+                away,
+                int(row["team_a_goals"]),
+                int(row["team_b_goals"]),
+            )
+            if valid is None:
+                continue
+            by_match[f"fd:{row['match_id']}"] = score_timing_metrics(valid, home, away)
+    return by_match
+
+
+def _load_espn_late85_points_swing_metrics(data_root: Path) -> dict[str, dict[str, dict[str, float]]]:
+    path = data_root / "static" / "worldcup_2026_manual_results.csv"
+    if not path.exists():
+        return {}
+    by_match: dict[str, dict[str, dict[str, float]]] = {}
+    summary_dir = data_root / "raw" / "espn" / "worldcup_2026"
+    with path.open(encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            event_id = _espn_event_id(row)
+            if not event_id:
+                continue
+            summary_path = summary_dir / f"summary_{event_id}.json"
+            if not summary_path.exists():
+                continue
+            try:
+                summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                continue
+            home = row["team_a"]
+            away = row["team_b"]
+            events = _espn_goal_events(summary)
+            valid = _valid_goal_events(
+                events,
+                home,
+                away,
+                int(row["team_a_goals"]),
+                int(row["team_b_goals"]),
+            )
+            if valid is None:
+                continue
+            by_match[f"fd:{row['match_id']}"] = late85_points_swing_metrics(valid, home, away)
+    return by_match
+
+
 def load_late85_points_swing_metrics(
     data_root: Path,
     training_rows: list[dict[str, Any]],
@@ -742,6 +1076,7 @@ def load_late85_points_swing_metrics(
     metrics: dict[str, dict[str, dict[str, float]]] = {}
     metrics.update(_load_api_late85_points_swing_metrics(data_root))
     metrics.update(_load_statsbomb_late85_points_swing_metrics(data_root, training_rows))
+    metrics.update(_load_espn_late85_points_swing_metrics(data_root))
     metrics.update(_load_manual_late85_points_swing_metrics(data_root))
     return metrics
 
@@ -753,6 +1088,7 @@ def load_score_timing_metrics(
     metrics: dict[str, dict[str, dict[str, float]]] = {}
     metrics.update(_load_api_score_timing_metrics(data_root))
     metrics.update(_load_statsbomb_score_timing_metrics(data_root, training_rows))
+    metrics.update(_load_espn_score_timing_metrics(data_root))
     metrics.update(_load_manual_score_timing_metrics(data_root))
     return metrics
 
@@ -860,6 +1196,7 @@ def _load_match_rows(data_root: Path, *, combined: bool) -> list[dict[str, Any]]
                     "result": result,
                 }
             )
+    rows = _attach_fotmob_worldcup_detail_stats(data_root, rows)
     rows.sort(key=lambda row: int(row["timestamp"]))
     return _deduplicate_real_matches(rows)
 
@@ -1592,6 +1929,13 @@ def _with_recent_features(
 ) -> list[dict[str, Any]]:
     histories: dict[str, deque[dict[str, int]]] = defaultdict(lambda: deque(maxlen=window))
     worldcup_histories: dict[str, deque[dict[str, int]]] = defaultdict(lambda: deque(maxlen=window))
+    worldcup_detail_histories: dict[str, deque[dict[str, Any]]] = defaultdict(
+        lambda: deque(maxlen=window)
+    )
+    current_worldcup_detail_histories: dict[
+        tuple[str, str],
+        deque[dict[str, Any]],
+    ] = defaultdict(lambda: deque(maxlen=window))
     head_to_head_histories: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     last_played: dict[str, date] = {}
     elo_ratings: dict[str, float] = defaultdict(lambda: BASE_ELO)
@@ -1675,6 +2019,28 @@ def _with_recent_features(
                 if wc_history
                 else None
             )
+            wc_detail_history = list(worldcup_detail_histories[team_key])
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+                values = [
+                    item[feature]
+                    for item in wc_detail_history
+                    if item.get(feature) is not None
+                ]
+                current[f"{side}_worldcup_recent6_{feature}_avg"] = (
+                    sum(values) / len(values) if values else None
+                )
+            current_wc_detail_history = list(
+                current_worldcup_detail_histories[(row["date"][:4], team_key)]
+            )
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+                values = [
+                    item[feature]
+                    for item in current_wc_detail_history
+                    if item.get(feature) is not None
+                ]
+                current[f"{side}_current_worldcup_recent6_{feature}_avg"] = (
+                    sum(values) / len(values) if values else None
+                )
             for feature in DETAIL_STAT_FEATURES:
                 values = [item[feature] for item in history if item.get(feature) is not None]
                 current[f"{side}_recent6_{feature}_avg"] = (
@@ -1702,6 +2068,16 @@ def _with_recent_features(
             if row["competition_name"] == "FIFA World Cup":
                 outcome = 1 if gf > ga else -1 if ga > gf else 0
                 worldcup_histories[team_key].append({"outcome": outcome})
+                detail_coverage = row.get(f"{side}_actual_fotmob_detail_coverage")
+                if detail_coverage not in (None, ""):
+                    detail_item = {
+                        feature: row.get(f"{side}_actual_{feature}")
+                        for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+                    }
+                    worldcup_detail_histories[team_key].append(detail_item)
+                    current_worldcup_detail_histories[(row["date"][:4], team_key)].append(
+                        detail_item
+                    )
             last_played[team_key] = match_date
         home_key = _team_history_key(row, "home")
         away_key = _team_history_key(row, "away")
@@ -2402,6 +2778,15 @@ def export_training_frame(
                 export_row[f"{side}_recent6_{feature}_avg"] = (
                     round(value, 4) if value is not None else None
                 )
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+                value = row[f"{side}_worldcup_recent6_{feature}_avg"]
+                export_row[f"{side}_worldcup_recent6_{feature}_avg"] = (
+                    round(value, 4) if value is not None else None
+                )
+                value = row[f"{side}_current_worldcup_recent6_{feature}_avg"]
+                export_row[f"{side}_current_worldcup_recent6_{feature}_avg"] = (
+                    round(value, 4) if value is not None else None
+                )
             for worldcup_index in range(1, 7):
                 for outcome in ("win", "draw", "loss"):
                     export_row[f"{side}_worldcup_last6_{worldcup_index}_{outcome}"] = row[
@@ -2569,6 +2954,17 @@ def export_clean_training_matrix(
         insert_at = clean_columns.index(f"{side}_rest_days") + 1
         detail_columns = [f"{side}_recent6_{feature}_avg" for feature in DETAIL_STAT_FEATURES]
         clean_columns[insert_at:insert_at] = detail_columns
+    for side in ("home", "away"):
+        insert_at = clean_columns.index(f"{side}_worldcup_recent6_win_rate") + 1
+        worldcup_detail_columns = [
+            f"{side}_worldcup_recent6_{feature}_avg"
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+        ]
+        worldcup_detail_columns.extend(
+            f"{side}_current_worldcup_recent6_{feature}_avg"
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+        )
+        clean_columns[insert_at:insert_at] = worldcup_detail_columns
     for side in ("home", "away"):
         insert_at = clean_columns.index(f"{side}_worldcup_recent6_win_rate")
         boolean_columns: list[str] = []

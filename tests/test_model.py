@@ -7,6 +7,8 @@ from kinela.model import (
     _normalise_stage_or_round,
     _rolling_team_averages,
     _update_rolling_team_stats,
+    load_late85_points_swing_metrics,
+    load_score_timing_metrics,
 )
 
 
@@ -102,6 +104,56 @@ def test_score_control_window_counts_matches_without_timeline(
     assert treated.loc[6, "home_recent6_score_timing_coverage"] == 1.0 / 6.0
     assert treated.loc[7, "home_recent6_score_control_value"] == 0.0
     assert treated.loc[7, "home_recent6_score_timing_coverage"] == 0.0
+
+
+def test_espn_summary_goal_timeline_feeds_score_timing(tmp_path) -> None:
+    manual = tmp_path / "static" / "worldcup_2026_manual_results.csv"
+    summary = tmp_path / "raw" / "espn" / "worldcup_2026" / "summary_760493.json"
+    manual.parent.mkdir(parents=True)
+    summary.parent.mkdir(parents=True)
+    manual.write_text(
+        "\n".join(
+            [
+                "match_id,date,stage,group,team_a,team_b,team_a_goals,team_b_goals,winner,source,notes",
+                "82,2026-07-01,ROUND_OF_32,,Belgium,Senegal,3,2,Belgium,ESPN event 760493,",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    summary.write_text(
+        """
+        {
+          "keyEvents": [
+            {"scoringPlay": true, "shootout": false, "type": {"type": "goal", "text": "Goal"}, "clock": {"displayValue": "24'"}, "team": {"displayName": "Senegal"}},
+            {"scoringPlay": true, "shootout": false, "type": {"type": "goal", "text": "Goal"}, "clock": {"displayValue": "51'"}, "team": {"displayName": "Senegal"}},
+            {"scoringPlay": true, "shootout": false, "type": {"type": "goal", "text": "Goal"}, "clock": {"displayValue": "86'"}, "team": {"displayName": "Belgium"}},
+            {"scoringPlay": true, "shootout": false, "type": {"type": "goal", "text": "Goal"}, "clock": {"displayValue": "89'"}, "team": {"displayName": "Belgium"}},
+            {"scoringPlay": true, "shootout": false, "type": {"type": "goal", "text": "Penalty - Scored"}, "clock": {"displayValue": "120'+5'"}, "team": {"displayName": "Belgium"}},
+            {"scoringPlay": true, "shootout": true, "type": {"type": "goal", "text": "Penalty - Scored"}, "clock": {"displayValue": "120'+6'"}, "team": {"displayName": "Senegal"}}
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    training_rows = [
+        {
+            "match_id": "fd:82",
+            "source": "manual-worldcup-2026",
+            "home_team": "Belgium",
+            "away_team": "Senegal",
+            "home_goals": 3,
+            "away_goals": 2,
+        }
+    ]
+
+    timing = load_score_timing_metrics(tmp_path, training_rows)
+    late = load_late85_points_swing_metrics(tmp_path, training_rows)
+
+    assert timing["fd:82"]["belgium"]["state_change_swing"] == 2.0
+    assert timing["fd:82"]["senegal"]["score_control_value"] > 0.5
+    assert late["fd:82"]["belgium"]["late85_points_swing_edge"] == 3.0
+    assert late["fd:82"]["senegal"]["late85_points_swing_edge"] == -3.0
 
 
 def test_real_match_dedup_prefers_manual_row_and_merges_api_detail() -> None:
