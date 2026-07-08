@@ -42,3 +42,5 @@ scripts/*
 !scripts/worldcup2026_out_of_sample_comparison.py
 !scripts/worldcup2026_espn_detail_walkforward.py
 !scripts/run_worldcup2026_fixed_r32_no_results.py
+!scripts/worldcup2026_walk_forward_retrain_evaluation.py
+!scripts/evaluate_penalty_shootout_model.py

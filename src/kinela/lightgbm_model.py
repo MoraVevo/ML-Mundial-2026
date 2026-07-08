@@ -320,15 +320,12 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "quality_form_edge",
     "goal_balance_edge",
     "draw_pressure_index",
-    "quality_score_control_swing_edge",
+    "score_timing_edge",
     "rating_guardrail_edge",
-    "match_script_compatibility_edge",
-    "clinical_low_block_matchup_edge",
     "club_star_finisher_edge",
-    "worldcup_points_memory_edge",
     "worldcup_fotmob_current_story_edge",
 ]
-NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v3_fotmob_current_story"
+NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v7_conservative_depth4_score_timing_no_clinical_no_script"
 NEUTRAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
 NEUTRAL_CANDIDATE_FEATURES = [
     "late85_points_swing_edge",
@@ -377,6 +374,7 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "club_attack_talent_edge",
     "club_star_finisher_edge",
     "club_talent_coverage_pair",
+    "worldcup_points_memory_edge",
     "worldcup_chance_quality_edge",
     "worldcup_detail_flow_edge",
     "worldcup_fotmob_xg_balance_edge",
@@ -391,6 +389,7 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "worldcup_fotmob_current_low_block_solution_edge",
     "worldcup_fotmob_current_transition_punch_edge",
     "worldcup_fotmob_current_unrewarded_pressure_edge",
+    "worldcup_fotmob_current_controlled_dominance_edge",
     "worldcup_fotmob_current_story_edge",
 ]
 NEUTRAL_EXPORT_FEATURES = list(
@@ -1198,6 +1197,15 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
         history_prefix: str = "worldcup",
     ) -> dict[str, pd.Series]:
         column_prefix = f"team_{prefix}_{history_prefix}_recent6"
+        xg = _num_series(out, f"{column_prefix}_fotmob_expected_goals")
+        xgc = _num_series(out, f"{column_prefix}_fotmob_expected_goals_conceded")
+        xgot = _num_series(out, f"{column_prefix}_fotmob_expected_goals_on_target")
+        big = _num_series(out, f"{column_prefix}_fotmob_big_chances")
+        big_conceded = _num_series(out, f"{column_prefix}_fotmob_big_chances_conceded")
+        big_missed = _num_series(out, f"{column_prefix}_fotmob_big_chances_missed")
+        shots = _num_series(out, f"{column_prefix}_fotmob_total_shots")
+        shots_on_target = _num_series(out, f"{column_prefix}_fotmob_shots_on_target")
+        touches_box = _num_series(out, f"{column_prefix}_fotmob_touches_opp_box")
         underlying = _num_series(out, f"{column_prefix}_fotmob_underlying_threat")
         finishing = _num_series(out, f"{column_prefix}_fotmob_finishing_signal")
         waste = _num_series(out, f"{column_prefix}_fotmob_waste_signal")
@@ -1225,11 +1233,40 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
             out,
             f"{column_prefix}_fotmob_clinical_chance_signal",
         )
-        xg_balance = _num_series(
-            out,
-            f"{column_prefix}_fotmob_expected_goals",
-        ) - _num_series(out, f"{column_prefix}_fotmob_expected_goals_conceded")
+        xg_balance = xg - xgc
+        shot_pressure = (
+            0.34 * np.tanh(xg / 1.65)
+            + 0.18 * np.tanh(xgot / 1.40)
+            + 0.16 * np.tanh(big / 2.80)
+            + 0.13 * np.tanh(shots / 14.0)
+            + 0.11 * np.tanh(shots_on_target / 4.8)
+            + 0.08 * np.tanh(touches_box / 24.0)
+        )
+        concession_control = (
+            0.58 * (1.0 - np.tanh(xgc / 1.55))
+            + 0.27 * (1.0 - np.tanh(big_conceded / 2.60))
+            + 0.15 * np.tanh(xg_balance / 1.65)
+        )
+        controlled_dominance = (
+            0.30 * chance_control
+            + 0.24 * shot_pressure
+            + 0.20 * concession_control
+            + 0.12 * underlying
+            + 0.08 * clinical
+            - 0.09 * waste
+            - 0.05 * sterile_control
+            - 0.03 * np.tanh(big_missed / 2.70)
+        ).clip(lower=-1.0, upper=1.0)
         return {
+            "xg": xg,
+            "xgc": xgc,
+            "xgot": xgot,
+            "big": big,
+            "big_conceded": big_conceded,
+            "big_missed": big_missed,
+            "shots": shots,
+            "shots_on_target": shots_on_target,
+            "touches_box": touches_box,
             "underlying": underlying,
             "finishing": finishing,
             "waste": waste,
@@ -1240,6 +1277,7 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
             "unrewarded": unrewarded,
             "clinical": clinical,
             "xg_balance": xg_balance,
+            "controlled_dominance": controlled_dominance,
         }
 
     a_wc_fotmob = side_worldcup_fotmob("a")
@@ -1348,9 +1386,16 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
     out["worldcup_fotmob_current_unrewarded_pressure_edge"] = current_wc_pair_coverage * (
         a_current_wc["unrewarded"] - b_current_wc["unrewarded"]
     ).clip(lower=-1.0, upper=1.0)
-    out["worldcup_fotmob_current_story_edge"] = out[
-        "worldcup_fotmob_current_low_block_solution_edge"
-    ].clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_current_controlled_dominance_edge"] = current_wc_pair_coverage * (
+        a_current_wc["controlled_dominance"] - b_current_wc["controlled_dominance"]
+    ).clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_current_story_edge"] = (
+        0.44 * out["worldcup_fotmob_current_controlled_dominance_edge"]
+        + 0.24 * out["worldcup_fotmob_current_chance_pressure_edge"]
+        + 0.18 * out["worldcup_fotmob_current_low_block_solution_edge"]
+        + 0.08 * out["worldcup_fotmob_current_transition_punch_edge"]
+        + 0.06 * out["worldcup_fotmob_current_unrewarded_pressure_edge"]
+    ).clip(lower=-1.0, upper=1.0)
     out["club_star_finisher_edge"] = _num_series(
         out,
         "team_a_club_star_finisher_signal",
@@ -2683,10 +2728,14 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
         "objective": "regression",
         "n_estimators": 350,
         "learning_rate": 0.035,
-        "num_leaves": 23,
-        "min_child_samples": 35,
-        "subsample": 0.85,
-        "colsample_bytree": 0.85,
+        "num_leaves": 12,
+        "max_depth": 4,
+        "min_child_samples": 60,
+        "subsample": 0.82,
+        "colsample_bytree": 0.82,
+        "reg_alpha": 0.10,
+        "reg_lambda": 1.0,
+        "min_split_gain": 0.005,
         "random_state": 42,
         "verbosity": -1,
     }
@@ -2711,10 +2760,14 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
         objective="multiclass",
         n_estimators=300,
         learning_rate=0.035,
-        num_leaves=23,
-        min_child_samples=35,
-        subsample=0.85,
-        colsample_bytree=0.85,
+        num_leaves=12,
+        max_depth=4,
+        min_child_samples=60,
+        subsample=0.82,
+        colsample_bytree=0.82,
+        reg_alpha=0.10,
+        reg_lambda=1.0,
+        min_split_gain=0.005,
         random_state=42,
         verbosity=-1,
     )

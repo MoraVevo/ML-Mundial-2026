@@ -42,6 +42,7 @@ from kinela.lightgbm_model import CATEGORICAL_FEATURES, NEUTRAL_FEATURES, add_ne
 from kinela.model import (
     BASE_ELO,
     DETAIL_STAT_FEATURES,
+    FOTMOB_WORLD_CUP_DETAIL_FEATURES,
     H2H_LOOKBACK_DAYS,
     RECENT_FORM_WINDOW,
     _cross_confederation_adjusted_points,
@@ -263,7 +264,13 @@ class WorldCup2026Simulator:
             (float(item["points"]) for item in self.fifa_rankings.values()),
             default=800.0,
         )
-        self.fifa_point_overrides = self._build_fifa_point_overrides()
+        self.tournament_start_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=False,
+        )
+        self.base_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=True,
+        )
+        self.fifa_point_overrides = dict(self.base_fifa_point_overrides)
         self.squad_quality = self._load_squad_quality()
         self.squad_players = self._load_squad_players()
         self.player_availability = self._load_player_availability()
@@ -295,6 +302,33 @@ class WorldCup2026Simulator:
                 _warn_if_model_runtime_mismatch(model, path)
                 return model
         return None
+
+    def _refresh_derived_state(self) -> None:
+        self.simulated_histories = defaultdict(list)
+        self.current_match_records = []
+        self.prediction_cache.clear()
+        self.team_histories = self._index_team_histories()
+        self.head_to_head_histories = self._index_head_to_head_histories()
+        self.worldcup_histories = self._index_worldcup_histories()
+        self.elo_ratings = self._build_elo_ratings()
+        self.confederation_stats, self.team_cross_confederation_stats = (
+            self._build_confederation_contexts()
+        )
+        self.tournament_start_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=False,
+        )
+        self.base_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=True,
+        )
+        self.fifa_point_overrides = dict(self.base_fifa_point_overrides)
+        contexts = self._goal_contexts()
+        self.global_goal_avg = contexts["global_avg"]
+        self.major_goal_avg = contexts["major_avg"]
+        self.group_goal_avg = contexts["group_avg"]
+        self.knockout_goal_avg = contexts["knockout_avg"]
+        self.major_match_count = contexts["major_matches"]
+        self.group_match_count = contexts["group_matches"]
+        self.knockout_match_count = contexts["knockout_matches"]
 
     def _load_third_place_assignment_table(self) -> dict[str, dict[int, str]]:
         path = self.data_root / "static" / "worldcup_2026_third_place_assignments.csv"
@@ -428,6 +462,8 @@ class WorldCup2026Simulator:
             indexed[home].append(
                 {
                     "date": row["date_obj"],
+                    "source": row.get("source", ""),
+                    "competition_name": row.get("competition_name", ""),
                     "gf": row["home_goals"],
                     "ga": row["away_goals"],
                     "points": _points(row["home_goals"], row["away_goals"]),
@@ -464,7 +500,8 @@ class WorldCup2026Simulator:
                     "detail_stats": {
                         feature: (
                             _float(row.get(f"home_actual_{feature}"))
-                            if _float(row.get(f"home_actual_{feature}")) is not None
+                            if feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+                            or _float(row.get(f"home_actual_{feature}")) is not None
                             else _float(row.get(f"home_recent6_{feature}_avg"))
                         )
                         for feature in DETAIL_STAT_FEATURES
@@ -474,6 +511,8 @@ class WorldCup2026Simulator:
             indexed[away].append(
                 {
                     "date": row["date_obj"],
+                    "source": row.get("source", ""),
+                    "competition_name": row.get("competition_name", ""),
                     "gf": row["away_goals"],
                     "ga": row["home_goals"],
                     "points": _points(row["away_goals"], row["home_goals"]),
@@ -510,7 +549,8 @@ class WorldCup2026Simulator:
                     "detail_stats": {
                         feature: (
                             _float(row.get(f"away_actual_{feature}"))
-                            if _float(row.get(f"away_actual_{feature}")) is not None
+                            if feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+                            or _float(row.get(f"away_actual_{feature}")) is not None
                             else _float(row.get(f"away_recent6_{feature}_avg"))
                         )
                         for feature in DETAIL_STAT_FEATURES
@@ -969,6 +1009,29 @@ class WorldCup2026Simulator:
             ]
             detail_stats[feature] = _mean(values, 0.0)
             detail_coverage_values.append(1.0 if values else 0.0)
+
+        def fotmob_worldcup_detail_stats(matches: list[dict[str, Any]]) -> dict[str, float]:
+            stats: dict[str, float] = {}
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+                values = [
+                    item["detail_stats"][feature]
+                    for item in matches
+                    if item.get("detail_stats", {}).get(feature) is not None
+                ]
+                stats[feature] = _mean(values, 0.0)
+            return stats
+
+        worldcup_recent = [
+            item
+            for item in history
+            if item.get("competition_name") == "FIFA World Cup"
+            and item.get("detail_stats", {}).get("fotmob_detail_coverage") is not None
+        ][-RECENT_FORM_WINDOW:]
+        current_worldcup_recent = [
+            item
+            for item in worldcup_recent
+            if item["date"].year == match_date.year
+        ][-RECENT_FORM_WINDOW:]
         score_metric_names = [
             "score_state_value",
             "score_control_value",
@@ -1108,6 +1171,10 @@ class WorldCup2026Simulator:
             "worldcup_recent6_win_rate": self._worldcup_recent6_win_rate(team, match_date),
             "rest_days": (match_date - history[-1]["date"]).days if history else None,
             "detail_stats": detail_stats,
+            "worldcup_detail_stats": fotmob_worldcup_detail_stats(worldcup_recent),
+            "current_worldcup_detail_stats": fotmob_worldcup_detail_stats(
+                current_worldcup_recent,
+            ),
             "detail_coverage": _mean(detail_coverage_values, 0.0),
         }
 
@@ -1137,11 +1204,17 @@ class WorldCup2026Simulator:
     def _elo(self, team: str) -> float:
         return self.elo_ratings.get(_normalise_name(team), BASE_ELO)
 
-    def _build_fifa_point_overrides(self) -> dict[str, float]:
+    def _build_fifa_point_overrides(
+        self,
+        *,
+        include_manual_worldcup: bool = True,
+    ) -> dict[str, float]:
         points: dict[str, float] = {
             key: float(value.get("points", self.fallback_fifa_points))
             for key, value in self.fifa_rankings.items()
         }
+        if not include_manual_worldcup:
+            return points
         for row in self.history:
             if row.get("source") != "manual-worldcup-2026":
                 continue
@@ -1156,6 +1229,12 @@ class WorldCup2026Simulator:
                 int(row["away_goals"]),
             )
         return points
+
+    def _reset_tournament_state(self) -> None:
+        self.simulated_histories = defaultdict(list)
+        self.current_match_records = []
+        self.fifa_point_overrides = dict(self.tournament_start_fifa_point_overrides)
+        self.prediction_cache.clear()
 
     def _worldcup_last6_flags(self, team: str, before: date) -> dict[str, int]:
         matches = self.worldcup_histories.get(_normalise_name(team), [])
@@ -1307,6 +1386,8 @@ class WorldCup2026Simulator:
         stage: str,
         group_table: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        # Keep recent-form features anchored to real completed matches; simulated
+        # results only update live FIFA overrides and explicit group context.
         a = self._team_features(team_a, match_date, include_simulated=False)
         b = self._team_features(team_b, match_date, include_simulated=False)
         fifa_a = self._fifa_ranking_features(team_a)
@@ -1586,6 +1667,15 @@ class WorldCup2026Simulator:
             row[f"recent6_{feature}_diff"] = (
                 a["detail_stats"][feature] - b["detail_stats"][feature]
             )
+        for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+            row[f"team_a_worldcup_recent6_{feature}"] = a["worldcup_detail_stats"][feature]
+            row[f"team_b_worldcup_recent6_{feature}"] = b["worldcup_detail_stats"][feature]
+            row[f"team_a_current_worldcup_recent6_{feature}"] = a[
+                "current_worldcup_detail_stats"
+            ][feature]
+            row[f"team_b_current_worldcup_recent6_{feature}"] = b[
+                "current_worldcup_detail_stats"
+            ][feature]
         row["team_a_tactical_detail_coverage"] = a["detail_coverage"]
         row["team_b_tactical_detail_coverage"] = b["detail_coverage"]
         return row
@@ -2144,8 +2234,7 @@ class WorldCup2026Simulator:
     def simulate_tournament(
         self,
     ) -> tuple[str, dict[str, str], dict[str, list[TeamStanding]], list[TeamStanding]]:
-        self.simulated_histories = defaultdict(list)
-        self.current_match_records = []
+        self._reset_tournament_state()
         standings = self.simulate_groups()
         thirds = self._best_thirds(standings)
         third_place_match_assignments = self._third_place_match_assignments(thirds)

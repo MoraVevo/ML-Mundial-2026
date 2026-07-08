@@ -5,6 +5,7 @@ import csv
 import json
 import sys
 from collections import Counter, defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ def _selected_model_path(data_root: Path, engine: str) -> str:
     if engine != "lightgbm":
         return ""
     for path in (
+        data_root / "models" / "lightgbm_neutral_all_played_wc2026.joblib",
         data_root / "models" / "lightgbm_neutral_worldcup_holdout.joblib",
         data_root / "models" / "lightgbm_neutral_model.joblib",
     ):
@@ -58,6 +60,34 @@ def _top_tuple_items(
     ]
 
 
+def _top_matchup_items(
+    counter: Counter[tuple[str, str]],
+    matchup_winners: dict[tuple[str, str], Counter[str]],
+    runs: int,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for (team_a, team_b), count in counter.most_common(limit):
+        winner_counter = matchup_winners.get((team_a, team_b), Counter())
+        winner, winner_count = (
+            winner_counter.most_common(1)[0] if winner_counter else ("", 0)
+        )
+        items.append(
+            {
+                "team_a": team_a,
+                "team_b": team_b,
+                "count": count,
+                "probability": round(count / runs, 6),
+                "top_winner": winner,
+                "top_winner_count": winner_count,
+                "top_winner_probability_given_matchup": (
+                    round(winner_count / count, 6) if count else 0.0
+                ),
+            }
+        )
+    return items
+
+
 def _semifinal_losers(winners: dict[str, str]) -> list[str]:
     losers: list[str] = []
     for match_id, previous_a, previous_b in SEMI_FINALS:
@@ -67,7 +97,9 @@ def _semifinal_losers(winners: dict[str, str]) -> list[str]:
     return losers
 
 
-def _knockout_signature(records: list[dict[str, Any]]) -> tuple[tuple[str, str, str, str, str], ...]:
+def _knockout_signature(
+    records: list[dict[str, Any]],
+) -> tuple[tuple[str, str, str, str, str], ...]:
     bracket_rows = []
     for row in records:
         if row["stage"] not in KNOCKOUT_STAGES:
@@ -105,7 +137,7 @@ def _signature_to_rows(
     }
 
 
-def run_consensus_bracket_simulation(
+def _run_simulation_counts(
     data_root: Path,
     *,
     runs: int,
@@ -113,11 +145,10 @@ def run_consensus_bracket_simulation(
     progress_every: int,
     fast_mode: bool,
     model_path: Path | None,
-    model_label: str,
+    worker_label: str = "",
 ) -> dict[str, Any]:
     engine = "lightgbm"
     simulator = WorldCup2026Simulator(data_root, seed=seed, engine=engine)
-    selected_model_path = str(model_path) if model_path else _selected_model_path(data_root, engine)
     if model_path:
         simulator.lightgbm_model = joblib.load(model_path)
         simulator.prediction_cache.clear()
@@ -156,6 +187,7 @@ def run_consensus_bracket_simulation(
     group_positions: dict[str, Counter[str]] = defaultdict(Counter)
     slot_matchups: dict[str, Counter[tuple[str, str]]] = defaultdict(Counter)
     slot_winners: dict[str, Counter[str]] = defaultdict(Counter)
+    slot_matchup_winners: dict[str, dict[tuple[str, str], Counter[str]]] = defaultdict(dict)
     full_brackets: Counter[tuple[tuple[str, str, str, str, str], ...]] = Counter()
 
     started = datetime.now()
@@ -189,8 +221,10 @@ def run_consensus_bracket_simulation(
             if row["stage"] not in KNOCKOUT_STAGES:
                 continue
             match_id = str(row["match_id"])
-            slot_matchups[match_id][(row["team_a"], row["team_b"])] += 1
+            matchup = (row["team_a"], row["team_b"])
+            slot_matchups[match_id][matchup] += 1
             slot_winners[match_id][row["winner"]] += 1
+            slot_matchup_winners[match_id].setdefault(matchup, Counter())[row["winner"]] += 1
 
         if progress_every and index % progress_every == 0:
             elapsed = (datetime.now() - started).total_seconds()
@@ -198,11 +232,109 @@ def run_consensus_bracket_simulation(
                 f"{team}: {count / index:.1%}"
                 for team, count in champions.most_common(3)
             )
+            prefix = f"worker {worker_label} | " if worker_label else ""
             print(
-                f"{index}/{runs} simulaciones | top campeones: {top3} | "
+                f"{prefix}{index}/{runs} simulaciones | top campeones: {top3} | "
                 f"ultima={champion} | {elapsed:.1f}s",
                 flush=True,
             )
+
+    return {
+        "champions": champions,
+        "finalists": finalists,
+        "semifinalists": semifinalists,
+        "first": first,
+        "second": second,
+        "third": third,
+        "fourth": fourth,
+        "best_thirds": best_thirds,
+        "group_positions": group_positions,
+        "slot_matchups": slot_matchups,
+        "slot_winners": slot_winners,
+        "slot_matchup_winners": slot_matchup_winners,
+        "full_brackets": full_brackets,
+    }
+
+
+def _merge_counts(target: dict[str, Any], source: dict[str, Any]) -> None:
+    for key in (
+        "champions",
+        "finalists",
+        "semifinalists",
+        "first",
+        "second",
+        "third",
+        "fourth",
+        "best_thirds",
+        "full_brackets",
+    ):
+        target[key].update(source[key])
+    for team, counter in source["group_positions"].items():
+        target["group_positions"][team].update(counter)
+    for match_id, counter in source["slot_matchups"].items():
+        target["slot_matchups"][match_id].update(counter)
+    for match_id, counter in source["slot_winners"].items():
+        target["slot_winners"][match_id].update(counter)
+    for match_id, matchup_winners in source["slot_matchup_winners"].items():
+        target_matchup_winners = target["slot_matchup_winners"][match_id]
+        for matchup, counter in matchup_winners.items():
+            target_matchup_winners.setdefault(matchup, Counter()).update(counter)
+
+
+def _empty_counts() -> dict[str, Any]:
+    return {
+        "champions": Counter(),
+        "finalists": Counter(),
+        "semifinalists": Counter(),
+        "first": Counter(),
+        "second": Counter(),
+        "third": Counter(),
+        "fourth": Counter(),
+        "best_thirds": Counter(),
+        "group_positions": defaultdict(Counter),
+        "slot_matchups": defaultdict(Counter),
+        "slot_winners": defaultdict(Counter),
+        "slot_matchup_winners": defaultdict(dict),
+        "full_brackets": Counter(),
+    }
+
+
+def _run_worker(args: dict[str, Any]) -> dict[str, Any]:
+    return _run_simulation_counts(**args)
+
+
+def _worker_run_counts(runs: int, workers: int) -> list[int]:
+    workers = max(1, min(workers, runs))
+    base = runs // workers
+    remainder = runs % workers
+    return [base + (1 if index < remainder else 0) for index in range(workers)]
+
+
+def _summarize_counts(
+    counts: dict[str, Any],
+    *,
+    runs: int,
+    seed: int,
+    engine: str,
+    selected_model_path: str,
+    model_label: str,
+    fast_mode: bool,
+    workers: int,
+    started: datetime,
+) -> dict[str, Any]:
+    champions = counts["champions"]
+    finalists = counts["finalists"]
+    semifinalists = counts["semifinalists"]
+    first = counts["first"]
+    second = counts["second"]
+    third = counts["third"]
+    fourth = counts["fourth"]
+    best_thirds = counts["best_thirds"]
+    group_positions = counts["group_positions"]
+    slot_matchups = counts["slot_matchups"]
+    slot_winners = counts["slot_winners"]
+    slot_matchup_winners = counts["slot_matchup_winners"]
+    full_brackets = counts["full_brackets"]
 
     teams = sorted(
         set(first) | set(second) | set(third) | set(fourth) | set(finalists) | set(semifinalists),
@@ -231,7 +363,12 @@ def run_consensus_bracket_simulation(
         slot_summary.append(
             {
                 "match_id": match_id,
-                "top_matchups": _top_tuple_items(slot_matchups[match_id], runs, limit=8),
+                "top_matchups": _top_matchup_items(
+                    slot_matchups[match_id],
+                    slot_matchup_winners[match_id],
+                    runs,
+                    limit=8,
+                ),
                 "top_winners": _top_items(slot_winners[match_id], runs, limit=8),
             }
         )
@@ -243,15 +380,23 @@ def run_consensus_bracket_simulation(
             "engine": engine,
             "model_path": selected_model_path,
             "model_label": model_label,
-            "model_note": "Neutral LightGBM; World Cup simulation uses advancement after penalties in knockouts.",
+            "model_note": (
+                "Neutral LightGBM; World Cup simulation uses advancement "
+                "after penalties in knockouts."
+            ),
             "accuracy_reference": "Played World Cup 2026 held-out evaluation used by the project.",
             "third_place_assignment": "exact_495_combination_table",
             "simulation_mode": "fast_fixed_matchup_probabilities" if fast_mode else "full_context",
             "simulation_mode_note": (
                 "Fast mode keeps each team-vs-team stage probability fixed across runs."
                 if fast_mode
-                else "Full mode recomputes context inside each simulated tournament."
+                else (
+                    "Full mode recomputes group-table context and live FIFA point "
+                    "updates inside each simulated tournament; recent-form features "
+                    "stay anchored to real completed matches to avoid fake-result feedback."
+                )
             ),
+            "workers": workers,
             "started_at": started.isoformat(timespec="seconds"),
             "finished_at": datetime.now().isoformat(timespec="seconds"),
         },
@@ -271,6 +416,65 @@ def run_consensus_bracket_simulation(
         "slot_summary": slot_summary,
         "most_frequent_full_bracket": _signature_to_rows(most_common_signature, support, runs),
     }
+
+
+def run_consensus_bracket_simulation(
+    data_root: Path,
+    *,
+    runs: int,
+    seed: int,
+    progress_every: int,
+    fast_mode: bool,
+    model_path: Path | None,
+    model_label: str,
+    workers: int = 1,
+) -> dict[str, Any]:
+    engine = "lightgbm"
+    selected_model_path = str(model_path) if model_path else _selected_model_path(data_root, engine)
+    started = datetime.now()
+    if workers <= 1:
+        counts = _run_simulation_counts(
+            data_root,
+            runs=runs,
+            seed=seed,
+            progress_every=progress_every,
+            fast_mode=fast_mode,
+            model_path=model_path,
+        )
+    else:
+        counts = _empty_counts()
+        run_counts = _worker_run_counts(runs, workers)
+        with ProcessPoolExecutor(max_workers=len(run_counts)) as executor:
+            futures = []
+            for index, worker_runs in enumerate(run_counts, start=1):
+                futures.append(
+                    executor.submit(
+                        _run_worker,
+                        {
+                            "data_root": data_root,
+                            "runs": worker_runs,
+                            "seed": seed + index * 100_003,
+                            "progress_every": progress_every,
+                            "fast_mode": fast_mode,
+                            "model_path": model_path,
+                            "worker_label": f"{index}/{len(run_counts)}",
+                        },
+                    )
+                )
+            for future in as_completed(futures):
+                _merge_counts(counts, future.result())
+
+    return _summarize_counts(
+        counts,
+        runs=runs,
+        seed=seed,
+        engine=engine,
+        selected_model_path=selected_model_path,
+        model_label=model_label,
+        fast_mode=fast_mode,
+        workers=max(1, min(workers, runs)),
+        started=started,
+    )
 
 
 def _write_outputs(result: dict[str, Any], output_path: Path) -> dict[str, str]:
@@ -294,14 +498,12 @@ def _write_outputs(result: dict[str, Any], output_path: Path) -> dict[str, str]:
             "matchup_probability",
             "winner",
             "winner_count",
-            "winner_probability",
+            "winner_probability_given_matchup",
         ]
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for slot in result["slot_summary"]:
-            winners = slot["top_winners"]
             for rank, matchup in enumerate(slot["top_matchups"], start=1):
-                winner = winners[rank - 1] if rank <= len(winners) else {}
                 writer.writerow(
                     {
                         "match_id": slot["match_id"],
@@ -310,9 +512,12 @@ def _write_outputs(result: dict[str, Any], output_path: Path) -> dict[str, str]:
                         "team_b": matchup["team_b"],
                         "matchup_count": matchup["count"],
                         "matchup_probability": matchup["probability"],
-                        "winner": winner.get("item", ""),
-                        "winner_count": winner.get("count", ""),
-                        "winner_probability": winner.get("probability", ""),
+                        "winner": matchup.get("top_winner", ""),
+                        "winner_count": matchup.get("top_winner_count", ""),
+                        "winner_probability_given_matchup": matchup.get(
+                            "top_winner_probability_given_matchup",
+                            "",
+                        ),
                     }
                 )
 
@@ -329,6 +534,7 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--progress-every", type=int, default=1)
+    parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--fast", dest="fast_mode", action="store_true")
     parser.add_argument("--model-path", type=Path)
     parser.add_argument("--model-label", default="")
@@ -348,7 +554,9 @@ def main() -> None:
         progress_every=args.progress_every,
         fast_mode=args.fast_mode,
         model_path=args.model_path,
-        model_label=args.model_label or ("explicit_model_path" if args.model_path else "default_model_priority"),
+        model_label=args.model_label
+        or ("explicit_model_path" if args.model_path else "default_model_priority"),
+        workers=args.workers,
     )
     paths = _write_outputs(result, output)
     print(json.dumps({**paths, **result["metadata"]}, indent=2, ensure_ascii=False), flush=True)

@@ -31,6 +31,22 @@ match_id,team,shots_on_goal,shots_off_goal,total_shots,blocked_shots,shots_insid
 87,Ghana,0,,8,5,,,10,2,0,39.3,3,0,7,376,312,80,,,0.11,2.04,2,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760501,ESPN summary API used to fill blank fields.
 88,Australia,1,,16,9,,,12,4,0,41.7,0,0,3,505,403,80,,,0.08,1.32,10,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760499,ESPN summary API used to fill blank fields.
 88,Egypt,3,,14,6,,,14,7,3,58.3,2,0,1,722,613,80,,,0.29,0.84,8,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760499,ESPN summary API used to fill blank fields.
+89,France,5,,15,4,,,11,12,0,75.9,3,0,1,569,510,90,,,1.17,,7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760503,ESPN summary API used to fill blank fields.
+89,Paraguay,1,,5,1,,,13,2,0,24.1,0,0,4,183,98,50,,,0.04,1.45,5,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760503,ESPN summary API used to fill blank fields.
+90,Canada,3,,10,3,,,24,11,2,44.7,4,0,1,359,272,80,,,0.28,0.82,3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760502,ESPN summary API used to fill blank fields.
+90,Morocco,4,,5,0,,,14,1,3,55.3,4,0,3,473,388,80,,,0.58,0.84,12,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760502,ESPN summary API used to fill blank fields.
+91,Brazil,4,,14,4,,,7,5,1,33.6,1,0,3,331,279,80,,,0.17,1.05,6,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760504,ESPN summary API used to fill blank fields.
+91,Norway,5,,9,1,,,6,5,1,66.4,0,0,4,681,618,90,,,0.47,2.61,5,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760504,ESPN summary API used to fill blank fields.
+92,England,5,,6,0,,,7,2,0,33.1,4,1,3,244,195,80,,,0.73,1.88,3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760505,ESPN summary API used to fill blank fields.
+92,Mexico,5,,20,7,,,14,12,1,66.9,2,0,2,453,418,90,,,1.18,1.61,5,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760505,ESPN summary API used to fill blank fields.
+93,Portugal,2,,10,3,,,9,3,2,44.6,2,0,5,427,357,80,,,0.28,1.69,4,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760506,ESPN summary API used to fill blank fields.
+93,Spain,6,,15,3,,,13,7,1,55.4,1,0,2,530,467,90,,,0.12,0.63,8,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760506,ESPN summary API used to fill blank fields.
+94,Belgium,7,,15,4,,,9,5,1,44.1,0,0,1,414,334,80,,,0.17,0.63,2,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760507,ESPN summary API used to fill blank fields.
+94,United States,2,,7,0,,,11,3,0,55.9,2,0,3,527,459,90,,,0.43,2.01,4,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760507,ESPN summary API used to fill blank fields.
+95,Argentina,7,,19,4,,,13,6,3,63.6,0,0,0,602,541,90,,,1.01,,8,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760509,ESPN summary API used to fill blank fields.
+95,Egypt,2,,5,1,,,11,1,0,36.4,4,0,4,349,287,80,,,0.12,2.84,3,1,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760509,ESPN summary API used to fill blank fields.
+96,Colombia,3,,15,4,,,21,7,4,46.6,2,0,2,547,454,80,,,0.22,0.39,7,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760508,ESPN summary API used to fill blank fields.
+96,Switzerland,2,,7,1,,,22,3,5,53.4,3,0,3,631,547,90,,,0.11,1.09,5,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,ESPN event 760508,ESPN summary API used to fill blank fields.
 537327,Mexico,4,,16,5,,,12,3,1,60.5,1,1,2,520,467,90,,,0.37,0.07,3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,theScore event 93089; ESPN event 760415,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537327,South Africa,2,,3,0,,,11,1,1,39.5,2,2,2,334,272,80,,,0.01,1.46,3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,theScore event 93089; ESPN event 760415,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.
 537328,Czechia,4,,7,1,,,16,5,2,38.5,0,0,4,327,230,70,,,0.18,2.30,3,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,theScore event 93101; ESPN event 760414,Imported from theScore Team Comparison. theScore labels shots as shots on goal; total shots are left blank unless another source provides them. ESPN summary API used to fill blank fields.

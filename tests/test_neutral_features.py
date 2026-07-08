@@ -4,9 +4,31 @@ import pandas as pd
 
 from kinela.lightgbm_model import (
     NEUTRAL_FEATURES,
+    NEUTRAL_MODEL_RECIPE,
     _calibrated_classifier_importances,
     add_neutral_treated_features,
 )
+
+
+def test_default_neutral_recipe_is_v6_score_timing_without_clinical() -> None:
+    assert (
+        NEUTRAL_MODEL_RECIPE
+        == "neutral_worldcup_v7_conservative_depth4_score_timing_no_clinical_no_script"
+    )
+    assert NEUTRAL_FEATURES == [
+        "competition_family",
+        "stage_or_round",
+        "rating_threat_edge",
+        "quality_form_edge",
+        "goal_balance_edge",
+        "draw_pressure_index",
+        "score_timing_edge",
+        "rating_guardrail_edge",
+        "club_star_finisher_edge",
+        "worldcup_fotmob_current_story_edge",
+    ]
+    assert "match_script_compatibility_edge" not in NEUTRAL_FEATURES
+    assert "clinical_low_block_matchup_edge" not in NEUTRAL_FEATURES
 
 
 def test_rating_threat_uses_historical_pre_match_ranking() -> None:
@@ -46,7 +68,7 @@ def test_rating_threat_uses_historical_pre_match_ranking() -> None:
     )
     assert "rating_drift_abs" not in NEUTRAL_FEATURES
     assert "rating_drift_edge" not in NEUTRAL_FEATURES
-    assert "worldcup_points_memory_edge" in NEUTRAL_FEATURES
+    assert "worldcup_points_memory_edge" not in NEUTRAL_FEATURES
 
 
 def test_recent_points_form_is_direct_and_quality_form_remains_contextual() -> None:
@@ -527,14 +549,24 @@ def test_current_worldcup_fotmob_story_requires_bilateral_coverage() -> None:
     assert treated.loc[0, "worldcup_fotmob_current_low_block_solution_edge"] > 0.0
     assert treated.loc[0, "worldcup_fotmob_current_transition_punch_edge"] > 0.0
     assert treated.loc[0, "worldcup_fotmob_current_unrewarded_pressure_edge"] > 0.0
+    assert treated.loc[0, "worldcup_fotmob_current_controlled_dominance_edge"] > 0.0
     assert treated.loc[0, "worldcup_fotmob_current_story_edge"] > 0.0
-    assert treated.loc[0, "worldcup_fotmob_current_story_edge"] == treated.loc[
-        0,
-        "worldcup_fotmob_current_low_block_solution_edge",
-    ]
+    expected_story = (
+        0.44 * treated.loc[0, "worldcup_fotmob_current_controlled_dominance_edge"]
+        + 0.24 * treated.loc[0, "worldcup_fotmob_current_chance_pressure_edge"]
+        + 0.18 * treated.loc[0, "worldcup_fotmob_current_low_block_solution_edge"]
+        + 0.08 * treated.loc[0, "worldcup_fotmob_current_transition_punch_edge"]
+        + 0.06 * treated.loc[0, "worldcup_fotmob_current_unrewarded_pressure_edge"]
+    )
+    assert math.isclose(
+        treated.loc[0, "worldcup_fotmob_current_story_edge"],
+        expected_story,
+        rel_tol=1e-12,
+    )
     assert treated.loc[1, "worldcup_fotmob_current_chance_pressure_edge"] == 0.0
     assert treated.loc[1, "worldcup_fotmob_current_low_block_solution_edge"] == 0.0
     assert treated.loc[1, "worldcup_fotmob_current_transition_punch_edge"] == 0.0
     assert treated.loc[1, "worldcup_fotmob_current_unrewarded_pressure_edge"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_current_controlled_dominance_edge"] == 0.0
     assert treated.loc[1, "worldcup_fotmob_current_story_edge"] == 0.0
     assert "worldcup_fotmob_current_story_edge" in NEUTRAL_FEATURES

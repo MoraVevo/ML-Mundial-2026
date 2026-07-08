@@ -866,37 +866,134 @@ def _load_statsbomb_score_timing_metrics(
     return by_match
 
 
+def _manual_goal_events_from_notes(
+    notes: str,
+    home_team: str,
+    away_team: str,
+    home_goals: int,
+    away_goals: int,
+) -> list[dict[str, Any]]:
+    if home_goals + away_goals == 0:
+        return []
+
+    def resolve_team(raw: str) -> str | None:
+        raw_key = normalise_team_name(raw)
+        home_key = normalise_team_name(home_team)
+        away_key = normalise_team_name(away_team)
+        raw_text = raw.strip().casefold()
+        home_text = home_team.strip().casefold()
+        away_text = away_team.strip().casefold()
+        if raw_text == home_text:
+            return home_team
+        if raw_text == away_text:
+            return away_team
+        if raw_key == home_key:
+            return home_team
+        if raw_key == away_key:
+            return away_team
+        if home_key and home_key in raw_key:
+            return home_team
+        if away_key and away_key in raw_key:
+            return away_team
+        return None
+
+    def minutes_from(text: str) -> list[tuple[int, int | None]]:
+        values: list[tuple[int, int | None]] = []
+        for match in re.finditer(r"(\d{1,3})(?:\+(\d{1,2}))?'", text):
+            values.append((int(match.group(1)), int(match.group(2) or 0) or None))
+        return values
+
+    events: list[dict[str, Any]] = []
+    seen: set[tuple[str, int, int]] = set()
+
+    def add_events(team: str | None, values: list[tuple[int, int | None]]) -> None:
+        if team is None:
+            return
+        for minute, extra in values:
+            key = (normalise_team_name(team), minute, extra or 0)
+            if key in seen:
+                continue
+            seen.add(key)
+            events.append(
+                {
+                    "type": "Goal",
+                    "time": {"elapsed": minute, "extra": extra},
+                    "team": {"name": team},
+                }
+            )
+
+    text = re.split(
+        r"\b(?:Yellow cards?|Red cards?|No red cards?|No red card)\b",
+        notes or "",
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    text = re.sub(r"^Final:[^.]*\.\s*", "", text).strip()
+    if not text:
+        return []
+
+    for clause in re.split(r";|\.(?:\s|$)", text):
+        clause = clause.strip()
+        if not clause or "'" not in clause:
+            continue
+        clause_lower = clause.casefold()
+        if "ruled out" in clause_lower or "offside" in clause_lower or "disallowed" in clause_lower:
+            continue
+        team: str | None = None
+        team_match = re.search(
+            r"\bfor\s+([^.;]+?)(?=[.;]|$|\s+(?:and|with|after|before)\b)",
+            clause,
+            flags=re.IGNORECASE,
+        )
+        if team_match:
+            team = resolve_team(team_match.group(1).strip())
+        if team is None:
+            clause_key = normalise_team_name(clause)
+            clause_text = clause.strip().casefold()
+            for candidate in (home_team, away_team):
+                candidate_key = normalise_team_name(candidate)
+                candidate_text = candidate.strip().casefold()
+                if (
+                    clause_key.startswith(candidate_key)
+                    or f"{candidate_key} goals" in clause_key
+                    or clause_text.startswith(candidate_text)
+                    or f"{candidate_text} goals" in clause_text
+                ):
+                    team = candidate
+                    break
+        add_events(team, minutes_from(clause))
+
+    if _valid_goal_events(events, home_team, away_team, home_goals, away_goals) is not None:
+        return events
+
+    all_minutes = minutes_from(text)
+    if home_goals > 0 and away_goals == 0 and len(all_minutes) == home_goals:
+        events = []
+        seen = set()
+        add_events(home_team, all_minutes)
+    elif away_goals > 0 and home_goals == 0 and len(all_minutes) == away_goals:
+        events = []
+        seen = set()
+        add_events(away_team, all_minutes)
+    return events
+
+
 def _load_manual_late85_points_swing_metrics(data_root: Path) -> dict[str, dict[str, dict[str, float]]]:
     path = data_root / "static" / "worldcup_2026_manual_results.csv"
     if not path.exists():
         return {}
     by_match: dict[str, dict[str, dict[str, float]]] = {}
-    minute_pattern = re.compile(r"(\d{1,3})(?:\+(\d{1,2}))?'(?:[^.;]*?)for ([^.;]+)")
     with path.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             home = row["team_a"]
             away = row["team_b"]
-            allowed = {normalise_team_name(home): home, normalise_team_name(away): away}
-            events = []
-            for match in minute_pattern.finditer(row.get("notes") or ""):
-                minute = int(match.group(1))
-                extra = int(match.group(2) or 0) or None
-                raw_team = match.group(3).strip()
-                raw_team = re.split(r"\s+(?:and|No red|Yellow|Red)\b", raw_team)[0].strip()
-                team = allowed.get(normalise_team_name(raw_team))
-                if team is None:
-                    if normalise_team_name(home) in normalise_team_name(raw_team):
-                        team = home
-                    elif normalise_team_name(away) in normalise_team_name(raw_team):
-                        team = away
-                if team:
-                    events.append(
-                        {
-                            "type": "Goal",
-                            "time": {"elapsed": minute, "extra": extra},
-                            "team": {"name": team},
-                        }
-                    )
+            events = _manual_goal_events_from_notes(
+                row.get("notes") or "",
+                home,
+                away,
+                int(row["team_a_goals"]),
+                int(row["team_b_goals"]),
+            )
             events = _valid_goal_events(
                 events,
                 home,
@@ -915,32 +1012,17 @@ def _load_manual_score_timing_metrics(data_root: Path) -> dict[str, dict[str, di
     if not path.exists():
         return {}
     by_match: dict[str, dict[str, dict[str, float]]] = {}
-    minute_pattern = re.compile(r"(\d{1,3})(?:\+(\d{1,2}))?'(?:[^.;]*?)for ([^.;]+)")
     with path.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             home = row["team_a"]
             away = row["team_b"]
-            allowed = {normalise_team_name(home): home, normalise_team_name(away): away}
-            events = []
-            for match in minute_pattern.finditer(row.get("notes") or ""):
-                minute = int(match.group(1))
-                extra = int(match.group(2) or 0) or None
-                raw_team = match.group(3).strip()
-                raw_team = re.split(r"\s+(?:and|No red|Yellow|Red)\b", raw_team)[0].strip()
-                team = allowed.get(normalise_team_name(raw_team))
-                if team is None:
-                    if normalise_team_name(home) in normalise_team_name(raw_team):
-                        team = home
-                    elif normalise_team_name(away) in normalise_team_name(raw_team):
-                        team = away
-                if team:
-                    events.append(
-                        {
-                            "type": "Goal",
-                            "time": {"elapsed": minute, "extra": extra},
-                            "team": {"name": team},
-                        }
-                    )
+            events = _manual_goal_events_from_notes(
+                row.get("notes") or "",
+                home,
+                away,
+                int(row["team_a_goals"]),
+                int(row["team_b_goals"]),
+            )
             events = _valid_goal_events(
                 events,
                 home,

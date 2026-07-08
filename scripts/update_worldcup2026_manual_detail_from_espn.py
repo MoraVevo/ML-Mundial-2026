@@ -6,6 +6,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import sys
 
@@ -35,6 +36,14 @@ KNOCKOUT_MATCHES = [
     {"match_id": "86", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Argentina", "team_b": "Cape Verde Islands"},
     {"match_id": "87", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Colombia", "team_b": "Ghana"},
     {"match_id": "88", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Australia", "team_b": "Egypt"},
+    {"match_id": "89", "date": "2026-07-04", "stage": "LAST_16", "team_a": "Paraguay", "team_b": "France"},
+    {"match_id": "90", "date": "2026-07-04", "stage": "LAST_16", "team_a": "Canada", "team_b": "Morocco"},
+    {"match_id": "91", "date": "2026-07-05", "stage": "LAST_16", "team_a": "Brazil", "team_b": "Norway"},
+    {"match_id": "92", "date": "2026-07-05", "stage": "LAST_16", "team_a": "Mexico", "team_b": "England"},
+    {"match_id": "93", "date": "2026-07-06", "stage": "LAST_16", "team_a": "Portugal", "team_b": "Spain"},
+    {"match_id": "94", "date": "2026-07-06", "stage": "LAST_16", "team_a": "United States", "team_b": "Belgium"},
+    {"match_id": "95", "date": "2026-07-07", "stage": "LAST_16", "team_a": "Argentina", "team_b": "Egypt"},
+    {"match_id": "96", "date": "2026-07-07", "stage": "LAST_16", "team_a": "Switzerland", "team_b": "Colombia"},
 ]
 
 ALIASES = {
@@ -129,11 +138,22 @@ def _event_winner(event: dict) -> str:
     return ""
 
 
+def _is_truthy_completed(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes"}
+    return False
+
+
 def _event_is_complete(event: dict) -> bool:
     competition = (event.get("competitions") or [{}])[0]
-    return bool(
-        competition.get("status", {}).get("type", {}).get("completed")
-        or event.get("status", {}).get("type", {}).get("completed")
+    return any(
+        _is_truthy_completed(value)
+        for value in (
+            competition.get("status", {}).get("type", {}).get("completed"),
+            event.get("status", {}).get("type", {}).get("completed"),
+        )
     )
 
 

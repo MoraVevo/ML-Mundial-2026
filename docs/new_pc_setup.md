@@ -85,7 +85,7 @@ Para una prueba mas fuerte, que ademas corre una simulacion completa:
 ## 5. Correr la simulacion larga
 
 ```cmd
-.venv\Scripts\python scripts\run_worldcup2026_consensus_bracket.py --runs 5000 --seed 42 --progress-every 25 --model-path data\models\lightgbm_neutral_all_played_wc2026.joblib --model-label all_played_wc2026_v3_full_context_5000 --output outputs\worldcup2026_consensus_bracket_5000_nueva_pc.json
+.venv\Scripts\python scripts\run_worldcup2026_consensus_bracket.py --runs 5000 --workers 8 --seed 42 --progress-every 25 --model-path data\models\lightgbm_neutral_all_played_wc2026.joblib --model-label all_played_wc2026_v7_full_context_5000 --output outputs\worldcup2026_consensus_bracket_5000_nueva_pc.json
 ```
 
 El script imprime progreso cada 25 iteraciones con los tres campeones mas

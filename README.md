@@ -1,24 +1,24 @@
 # ML Mundial 2026
 
-Modelo de machine learning para prediccion de partidos del Mundial 2026, con
-67.31% de accuracy en test aleatorio temporal y 60.00% de accuracy sobre 75
-partidos ya disputados del Mundial. El proyecto destaca por lograr poder
-predictivo con datos limitados, controles anti-leakage y una receta parsimoniosa
-de 12 variables prepartido.
+Modelo de machine learning para prediccion de partidos del Mundial 2026. La
+receta activa es un LightGBM neutral v7 conservador de 10 variables prepartido,
+con 61/96 aciertos (`63.54%`) en el holdout oficial de partidos ya disputados
+del Mundial 2026 al 2026-07-07.
 
 | Evaluacion | Accuracy | Correctos | Partidos | Lectura rapida |
 |---|---:|---:|---:|---|
-| Test aleatorio temporal | 67.31% | 70/104 | 104 | Generalizacion en partidos oficiales recientes no vistos |
-| Test Mundial 2026 | 60.00% | 45/75 | 75 | Rendimiento sobre partidos reales ya jugados del Mundial |
-| Test combinado objetivo | 63.69% | 114/179 | 179 | Mundial 2026 jugado mas partidos oficiales recientes |
+| Test externo temporal | 63.46% | 66/104 | 104 | Diagnostico externo en partidos oficiales recientes no vistos |
+| Test Mundial 2026 | 63.54% | 61/96 | 96 | Holdout principal: partidos reales ya jugados del Mundial |
+| Test combinado objetivo | 60.10% | 119/198 | 198 | Mundial 2026 jugado mas partidos oficiales recientes |
+| Artefacto all-played | N/A | N/A | 883 train | Modelo para predicciones futuras con resultados jugados incorporados |
 
 ## Pronostico visual del torneo
 
 La grafica principal usa cuatro paneles separados para mostrar las
-probabilidades de terminar primero, segundo, tercero o cuarto. Sale de una
-emulacion completa de 1,500 simulaciones con un modelo entrenado sin partidos del
-Mundial 2026, usando los resultados ya conocidos como estado del torneo,
-asignacion exacta de mejores terceros y avance por penales en eliminatorias.
+probabilidades de terminar primero, segundo, tercero o cuarto. El flujo actual
+de simulacion usa el artefacto all-played v7, con todos los partidos ya jugados
+incorporados antes de predecir cruces pendientes, asignacion exacta de mejores
+terceros y avance por penales en eliminatorias.
 
 ![Probabilidades top 4 del Mundial 2026](docs/assets/worldcup_2026_top4_probabilities.png)
 
@@ -124,8 +124,8 @@ python scripts\generate_model_evaluation_report.py
 ### 6. Simulacion del torneo
 
 ```powershell
-python scripts\run_worldcup2026_consensus_bracket.py --runs 1500 --seed 42 --progress-every 50 --model-path data\models\lightgbm_neutral_worldcup_holdout.joblib --model-label worldcup_holdout_oos_full_1500 --output outputs\worldcup2026_consensus_bracket_1500_holdout_oos_full_2026-06-30.json
-python scripts\generate_worldcup2026_top4_visual.py --input outputs\worldcup2026_consensus_bracket_1500_holdout_oos_full_2026-06-30.json
+python scripts\run_worldcup2026_consensus_bracket.py --runs 5000 --workers 8 --seed 42 --progress-every 25 --model-path data\models\lightgbm_neutral_all_played_wc2026.joblib --model-label all_played_wc2026_v7_full_context_5000 --output outputs\worldcup2026_consensus_bracket_5000_v7.json
+python scripts\generate_worldcup2026_top4_visual.py --input outputs\worldcup2026_consensus_bracket_5000_v7.json
 ```
 
 ## Evaluacion del modelo
@@ -137,13 +137,14 @@ analisis de error e importancia de features esta en
 ## Modelo
 
 El modelo de produccion usa variables prepartido de ranking, forma reciente,
-balance de goles, contexto de fase, compatibilidad tactica, memoria mundialista
-reciente y ventaja de finalizador diferencial.
+balance de goles, contexto de fase, score timing validado, historia actual del
+Mundial y ventaja de finalizador diferencial.
 
 La evaluacion principal reporta accuracy sobre partidos ya jugados del Mundial
 2026. Esos partidos se separan como test y no se usan para entrenar el modelo
-que calcula ese accuracy. La simulacion publica usa ese mismo artefacto holdout
-para mantener una lectura out-of-sample clara.
+que calcula ese accuracy. Las predicciones futuras y simulaciones largas usan
+el artefacto all-played, que incorpora todos los resultados ya jugados antes de
+predecir cruces pendientes.
 
 ## Estructura
 
