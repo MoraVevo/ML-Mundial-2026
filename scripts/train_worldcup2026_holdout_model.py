@@ -19,7 +19,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from kinela.lightgbm_model import CATEGORICAL_FEATURES, NEUTRAL_FEATURES, NEUTRAL_MODEL_RECIPE
+from kinela.lightgbm_model import (
+    CATEGORICAL_FEATURES,
+    NEUTRAL_GOAL_FEATURES,
+    NEUTRAL_MODEL_RECIPE,
+    NEUTRAL_RESULT_FEATURES,
+    NEUTRAL_XG_RESULT_BLEND_WEIGHT,
+    blend_result_probabilities,
+)
 
 from generate_model_evaluation_report import (  # noqa: E402
     CLF_PARAMS,
@@ -67,20 +74,22 @@ def train_holdout_model(data_root: Path) -> tuple[dict[str, Any], dict[str, Any]
     if train.empty or test.empty:
         raise RuntimeError("World Cup holdout split produced an empty train or test set")
 
-    features = list(NEUTRAL_FEATURES)
-    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in features]
+    goal_features = list(NEUTRAL_GOAL_FEATURES)
+    result_features = list(NEUTRAL_RESULT_FEATURES)
+    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in goal_features]
+    result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in result_features]
     weights = train["match_recency_weight"].astype(float).to_numpy(copy=True)
 
     team_a_model = lgb.LGBMRegressor(**REG_PARAMS)
     team_b_model = lgb.LGBMRegressor(**REG_PARAMS)
     team_a_model.fit(
-        train[features],
+        train[goal_features],
         train["team_a_goals"],
         sample_weight=weights,
         categorical_feature=categorical,
     )
     team_b_model.fit(
-        train[features],
+        train[goal_features],
         train["team_b_goals"],
         sample_weight=weights,
         categorical_feature=categorical,
@@ -92,17 +101,31 @@ def train_holdout_model(data_root: Path) -> tuple[dict[str, Any], dict[str, Any]
         cv=3,
     )
     result_model.fit(
-        train[features],
+        train[goal_features],
         train["result_label"],
         sample_weight=weights,
         categorical_feature=categorical,
     )
+    xg_result_model = CalibratedClassifierCV(
+        lgb.LGBMClassifier(**CLF_PARAMS),
+        method="sigmoid",
+        cv=3,
+    )
+    xg_result_model.fit(
+        train[result_features],
+        train["result_label"],
+        sample_weight=weights,
+        categorical_feature=result_categorical,
+    )
 
-    probabilities = result_model.predict_proba(test[features])
+    probabilities = blend_result_probabilities(
+        result_model.predict_proba(test[goal_features]),
+        xg_result_model.predict_proba(test[result_features]),
+    )
     labels = test["result_label"].astype(int).to_numpy()
     predicted = probabilities.argmax(axis=1)
-    pred_a = np.clip(team_a_model.predict(test[features]), 0.0, None)
-    pred_b = np.clip(team_b_model.predict(test[features]), 0.0, None)
+    pred_a = np.clip(team_a_model.predict(test[goal_features]), 0.0, None)
+    pred_b = np.clip(team_b_model.predict(test[goal_features]), 0.0, None)
     mae_a = float(mean_absolute_error(test["team_a_goals"], pred_a))
     mae_b = float(mean_absolute_error(test["team_b_goals"], pred_b))
 
@@ -110,7 +133,13 @@ def train_holdout_model(data_root: Path) -> tuple[dict[str, Any], dict[str, Any]
         "team_a_goals_model": team_a_model,
         "team_b_goals_model": team_b_model,
         "result_model": result_model,
-        "features": features,
+        "xg_result_model": xg_result_model,
+        "features": goal_features,
+        "team_a_goal_features": goal_features,
+        "team_b_goal_features": goal_features,
+        "result_features": goal_features,
+        "xg_result_features": result_features,
+        "result_probability_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
         "model_id": f"{NEUTRAL_MODEL_RECIPE}_worldcup_2026_holdout",
         "sklearn_version": sklearn.__version__,
         "lightgbm_version": lgb.__version__,
@@ -118,7 +147,10 @@ def train_holdout_model(data_root: Path) -> tuple[dict[str, Any], dict[str, Any]
     }
     metadata = {
         "model_id": model["model_id"],
-        "features": features,
+        "features": goal_features,
+        "goal_features": goal_features,
+        "result_features": result_features,
+        "xg_result_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
         "training_policy": split_meta["policy"],
         "test_start": split_meta["test_start"],
         "test_end": split_meta["test_end"],

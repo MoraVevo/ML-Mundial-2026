@@ -38,7 +38,12 @@ from kinela.fifa_ranking import (
     normalise_team_name,
     update_live_fifa_points,
 )
-from kinela.lightgbm_model import CATEGORICAL_FEATURES, NEUTRAL_FEATURES, add_neutral_treated_features
+from kinela.lightgbm_model import (
+    CATEGORICAL_FEATURES,
+    NEUTRAL_FEATURES,
+    add_neutral_treated_features,
+    blend_result_probabilities,
+)
 from kinela.model import (
     BASE_ELO,
     DETAIL_STAT_FEATURES,
@@ -1683,13 +1688,24 @@ class WorldCup2026Simulator:
     def _cache_key(self, team_a: str, team_b: str, match_date: date, stage: str) -> tuple[str, str, str, str]:
         return (_normalise_name(team_a), _normalise_name(team_b), match_date.isoformat(), stage)
 
-    def _lightgbm_feature_names(self) -> list[str]:
+    def _lightgbm_feature_names(self, model_key: str = "result") -> list[str]:
         if self.lightgbm_model is None:
             return list(NEUTRAL_FEATURES)
-        return list(self.lightgbm_model.get("features", NEUTRAL_FEATURES))
+        legacy_features = list(self.lightgbm_model.get("features", NEUTRAL_FEATURES))
+        feature_fields = {
+            "team_a_goals": "team_a_goal_features",
+            "team_b_goals": "team_b_goal_features",
+            "result": "result_features",
+            "xg_result": "xg_result_features",
+        }
+        return list(self.lightgbm_model.get(feature_fields.get(model_key, "features"), legacy_features))
 
-    def _lightgbm_frame(self, rows: list[dict[str, Any]]) -> pd.DataFrame:
-        features = self._lightgbm_feature_names()
+    def _lightgbm_frame(
+        self,
+        rows: list[dict[str, Any]],
+        features: list[str] | None = None,
+    ) -> pd.DataFrame:
+        features = features if features is not None else self._lightgbm_feature_names()
         frame = add_neutral_treated_features(pd.DataFrame(rows))
         for feature in features:
             if feature not in frame:
@@ -1701,6 +1717,28 @@ class WorldCup2026Simulator:
         for column in frame.columns.difference(categorical):
             frame[column] = pd.to_numeric(frame[column], errors="coerce").fillna(0)
         return frame
+
+    def _lightgbm_prediction_frames(self, rows: list[dict[str, Any]]) -> dict[str, pd.DataFrame]:
+        feature_sets = {
+            "team_a_goals": self._lightgbm_feature_names("team_a_goals"),
+            "team_b_goals": self._lightgbm_feature_names("team_b_goals"),
+            "result": self._lightgbm_feature_names("result"),
+            "xg_result": self._lightgbm_feature_names("xg_result"),
+        }
+        all_features = list(dict.fromkeys(feature for values in feature_sets.values() for feature in values))
+        frame = self._lightgbm_frame(rows, all_features)
+        return {name: frame[features] for name, features in feature_sets.items()}
+
+    def _lightgbm_result_probabilities(self, frames: dict[str, pd.DataFrame]) -> Any:
+        probabilities = self.lightgbm_model["result_model"].predict_proba(frames["result"])
+        xg_model = self.lightgbm_model.get("xg_result_model")
+        if xg_model is None:
+            return probabilities
+        return blend_result_probabilities(
+            probabilities,
+            xg_model.predict_proba(frames["xg_result"]),
+            weight=float(self.lightgbm_model.get("result_probability_blend_weight", 0.50)),
+        )
 
     def _precompute_lightgbm_cache(self) -> None:
         teams = sorted({team for group in self.groups.values() for team in group})
@@ -1742,11 +1780,11 @@ class WorldCup2026Simulator:
                         )
                     )
 
-        frame = self._lightgbm_frame([row for _, row, _, _, _ in requests])
+        frames = self._lightgbm_prediction_frames([row for _, row, _, _, _ in requests])
 
-        team_a_goals = self.lightgbm_model["team_a_goals_model"].predict(frame)
-        team_b_goals = self.lightgbm_model["team_b_goals_model"].predict(frame)
-        probabilities = self.lightgbm_model["result_model"].predict_proba(frame)
+        team_a_goals = self.lightgbm_model["team_a_goals_model"].predict(frames["team_a_goals"])
+        team_b_goals = self.lightgbm_model["team_b_goals_model"].predict(frames["team_b_goals"])
+        probabilities = self._lightgbm_result_probabilities(frames)
         for index, (key, _, team_a, team_b, match_date) in enumerate(requests):
             self.prediction_cache[key] = {
                 "team_a_goals": max(0.15, float(team_a_goals[index])),
@@ -1778,10 +1816,16 @@ class WorldCup2026Simulator:
                 self.prediction_cache[cache_key] = prediction
             return prediction
         row = self._lightgbm_features(team_a, team_b, match_date, stage, group_table)
-        frame = self._lightgbm_frame([row])
-        team_a_goals = max(0.15, float(self.lightgbm_model["team_a_goals_model"].predict(frame)[0]))
-        team_b_goals = max(0.15, float(self.lightgbm_model["team_b_goals_model"].predict(frame)[0]))
-        probabilities = self.lightgbm_model["result_model"].predict_proba(frame)[0]
+        frames = self._lightgbm_prediction_frames([row])
+        team_a_goals = max(
+            0.15,
+            float(self.lightgbm_model["team_a_goals_model"].predict(frames["team_a_goals"])[0]),
+        )
+        team_b_goals = max(
+            0.15,
+            float(self.lightgbm_model["team_b_goals_model"].predict(frames["team_b_goals"])[0]),
+        )
+        probabilities = self._lightgbm_result_probabilities(frames)[0]
         prediction = {
             "team_a_goals": team_a_goals,
             "team_b_goals": team_b_goals,

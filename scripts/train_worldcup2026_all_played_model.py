@@ -20,7 +20,13 @@ if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
 from generate_model_evaluation_report import CLF_PARAMS, REG_PARAMS, _prepare_neutral  # noqa: E402
-from kinela.lightgbm_model import CATEGORICAL_FEATURES, NEUTRAL_FEATURES, NEUTRAL_MODEL_RECIPE  # noqa: E402
+from kinela.lightgbm_model import (  # noqa: E402
+    CATEGORICAL_FEATURES,
+    NEUTRAL_GOAL_FEATURES,
+    NEUTRAL_MODEL_RECIPE,
+    NEUTRAL_RESULT_FEATURES,
+    NEUTRAL_XG_RESULT_BLEND_WEIGHT,
+)
 
 
 def _first_existing(data_root: Path, candidates: list[str]) -> Path:
@@ -55,20 +61,22 @@ def train_all_played_model(data_root: Path) -> tuple[dict[str, Any], dict[str, A
     if train.empty:
         raise RuntimeError("All-played training split produced no rows")
 
-    features = list(NEUTRAL_FEATURES)
-    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in features]
+    goal_features = list(NEUTRAL_GOAL_FEATURES)
+    result_features = list(NEUTRAL_RESULT_FEATURES)
+    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in goal_features]
+    result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in result_features]
     weights = train["match_recency_weight"].astype(float).to_numpy(copy=True)
 
     team_a_model = lgb.LGBMRegressor(**REG_PARAMS)
     team_b_model = lgb.LGBMRegressor(**REG_PARAMS)
     team_a_model.fit(
-        train[features],
+        train[goal_features],
         train["team_a_goals"],
         sample_weight=weights,
         categorical_feature=categorical,
     )
     team_b_model.fit(
-        train[features],
+        train[goal_features],
         train["team_b_goals"],
         sample_weight=weights,
         categorical_feature=categorical,
@@ -80,10 +88,21 @@ def train_all_played_model(data_root: Path) -> tuple[dict[str, Any], dict[str, A
         cv=3,
     )
     result_model.fit(
-        train[features],
+        train[goal_features],
         train["result_label"],
         sample_weight=weights,
         categorical_feature=categorical,
+    )
+    xg_result_model = CalibratedClassifierCV(
+        lgb.LGBMClassifier(**CLF_PARAMS),
+        method="sigmoid",
+        cv=3,
+    )
+    xg_result_model.fit(
+        train[result_features],
+        train["result_label"],
+        sample_weight=weights,
+        categorical_feature=result_categorical,
     )
 
     worldcup_rows = training[
@@ -100,7 +119,13 @@ def train_all_played_model(data_root: Path) -> tuple[dict[str, Any], dict[str, A
         "team_a_goals_model": team_a_model,
         "team_b_goals_model": team_b_model,
         "result_model": result_model,
-        "features": features,
+        "xg_result_model": xg_result_model,
+        "features": goal_features,
+        "team_a_goal_features": goal_features,
+        "team_b_goal_features": goal_features,
+        "result_features": goal_features,
+        "xg_result_features": result_features,
+        "result_probability_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
         "model_id": model_id,
         "sklearn_version": sklearn.__version__,
         "lightgbm_version": lgb.__version__,
@@ -108,7 +133,10 @@ def train_all_played_model(data_root: Path) -> tuple[dict[str, Any], dict[str, A
     }
     metadata = {
         "model_id": model_id,
-        "features": features,
+        "features": goal_features,
+        "goal_features": goal_features,
+        "result_features": result_features,
+        "xg_result_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
         "training_policy": policy,
         "train_matches": int(len(training)),
         "train_rows_after_augmentation": int(len(train)),

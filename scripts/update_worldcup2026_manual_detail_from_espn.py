@@ -44,6 +44,7 @@ KNOCKOUT_MATCHES = [
     {"match_id": "94", "date": "2026-07-06", "stage": "LAST_16", "team_a": "United States", "team_b": "Belgium"},
     {"match_id": "95", "date": "2026-07-07", "stage": "LAST_16", "team_a": "Argentina", "team_b": "Egypt"},
     {"match_id": "96", "date": "2026-07-07", "stage": "LAST_16", "team_a": "Switzerland", "team_b": "Colombia"},
+    {"match_id": "97", "date": "2026-07-09", "stage": "QUARTER_FINALS", "team_a": "France", "team_b": "Morocco"},
 ]
 
 ALIASES = {

@@ -1,22 +1,23 @@
 # ML Mundial 2026
 
 Modelo de machine learning para prediccion de partidos del Mundial 2026. La
-receta activa es un LightGBM neutral v7 conservador de 10 variables prepartido,
-con 61/96 aciertos (`63.54%`) en el holdout oficial de partidos ya disputados
-del Mundial 2026 al 2026-07-07.
+receta activa es un LightGBM neutral v9: conserva 10 variables prepartido para
+los goles y combina por igual un clasificador base con otro que ve dos xG de
+matchup. Logra 63/97 aciertos (`64.95%`) en el holdout oficial de partidos ya
+disputados del Mundial 2026 al 2026-07-09.
 
 | Evaluacion | Accuracy | Correctos | Partidos | Lectura rapida |
 |---|---:|---:|---:|---|
-| Test externo temporal | 63.46% | 66/104 | 104 | Diagnostico externo en partidos oficiales recientes no vistos |
-| Test Mundial 2026 | 63.54% | 61/96 | 96 | Holdout principal: partidos reales ya jugados del Mundial |
-| Test combinado objetivo | 60.10% | 119/198 | 198 | Mundial 2026 jugado mas partidos oficiales recientes |
-| Artefacto all-played | N/A | N/A | 883 train | Modelo para predicciones futuras con resultados jugados incorporados |
+| Test externo temporal | 65.38% | 68/104 | 104 | Diagnostico externo en partidos oficiales recientes no vistos |
+| Test Mundial 2026 | 64.95% | 63/97 | 97 | Holdout principal: partidos reales ya jugados del Mundial |
+| Test combinado objetivo | 63.68% | 128/201 | 201 | Mundial 2026 jugado mas partidos oficiales recientes |
+| Artefacto all-played | N/A | N/A | 884 train | Modelo para predicciones futuras con resultados jugados incorporados |
 
 ## Pronostico visual del torneo
 
 La grafica principal usa cuatro paneles separados para mostrar las
 probabilidades de terminar primero, segundo, tercero o cuarto. El flujo actual
-de simulacion usa el artefacto all-played v7, con todos los partidos ya jugados
+de simulacion usa el artefacto all-played v9, con todos los partidos ya jugados
 incorporados antes de predecir cruces pendientes, asignacion exacta de mejores
 terceros y avance por penales en eliminatorias.
 
@@ -77,7 +78,7 @@ El proyecto sigue una sola secuencia de trabajo:
 2. Normalizar las fuentes a tablas consistentes.
 3. Construir el frame de entrenamiento nacional.
 4. Exportar la matriz limpia y la matriz final del modelo.
-5. Entrenar el modelo holdout del Mundial.
+5. Entrenar el modelo holdout del Mundial y el artefacto all-played para los cruces pendientes.
 6. Recalcular metricas y reporte tecnico.
 7. Simular el torneo y regenerar el visual publico.
 
@@ -109,6 +110,7 @@ kinela export neutral-training-matrix-national
 
 ```powershell
 python scripts\train_worldcup2026_holdout_model.py
+python scripts\train_worldcup2026_all_played_model.py
 ```
 
 ### 5. Metricas
@@ -124,8 +126,8 @@ python scripts\generate_model_evaluation_report.py
 ### 6. Simulacion del torneo
 
 ```powershell
-python scripts\run_worldcup2026_consensus_bracket.py --runs 5000 --workers 8 --seed 42 --progress-every 25 --model-path data\models\lightgbm_neutral_all_played_wc2026.joblib --model-label all_played_wc2026_v7_full_context_5000 --output outputs\worldcup2026_consensus_bracket_5000_v7.json
-python scripts\generate_worldcup2026_top4_visual.py --input outputs\worldcup2026_consensus_bracket_5000_v7.json
+python scripts\run_worldcup2026_consensus_bracket.py --runs 5000 --workers 8 --seed 42 --progress-every 25 --model-path data\models\lightgbm_neutral_all_played_wc2026.joblib --model-label all_played_wc2026_v9_full_context_5000 --output outputs\worldcup2026_consensus_bracket_5000_v9.json
+python scripts\generate_worldcup2026_top4_visual.py --input outputs\worldcup2026_consensus_bracket_5000_v9.json
 ```
 
 ## Evaluacion del modelo
@@ -138,7 +140,16 @@ analisis de error e importancia de features esta en
 
 El modelo de produccion usa variables prepartido de ranking, forma reciente,
 balance de goles, contexto de fase, score timing validado, historia actual del
-Mundial y ventaja de finalizador diferencial.
+Mundial y ventaja de finalizador diferencial. Un clasificador paralelo recibe
+ademas el xG que cada lado suele crear combinado con el xG que su rival suele
+conceder; sus probabilidades se mezclan 50/50 con las del clasificador base.
+Los regresores de goles no reciben este xG porque en validacion agregaba ruido
+al MAE.
+
+Como control anti-overfitting, una validacion walk-forward expansiva revela
+cada partido del Mundial en orden: v9 logra 63/96 (`65.63%`) y log-loss `0.8468`,
+frente a 62/96 y `0.8522` de la base v8. El MAE de goles se mantiene igual porque
+el ensamble solo modifica probabilidades de resultado.
 
 La evaluacion principal reporta accuracy sobre partidos ya jugados del Mundial
 2026. Esos partidos se separan como test y no se usan para entrenar el modelo

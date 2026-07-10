@@ -31,7 +31,12 @@ def test_lightgbm_prediction_does_not_apply_untrained_squad_multiplier() -> None
     }
     simulator._cache_key = lambda *args: args
     simulator._lightgbm_features = lambda *args, **kwargs: {"feature": 1.0}
-    simulator._lightgbm_frame = lambda rows: rows
+    simulator._lightgbm_prediction_frames = lambda rows: {
+        "team_a_goals": rows,
+        "team_b_goals": rows,
+        "result": rows,
+        "xg_result": rows,
+    }
     simulator._squad_strength_multipliers = lambda *args: (_ for _ in ()).throw(
         AssertionError("squad multiplier must not be called")
     )
@@ -69,7 +74,12 @@ def test_lightgbm_prediction_bypasses_cache_when_group_table_is_provided() -> No
     calls = []
     simulator._cache_key = lambda *args: cache_key
     simulator._lightgbm_features = lambda *args, **kwargs: calls.append(kwargs) or {"feature": 1.0}
-    simulator._lightgbm_frame = lambda rows: rows
+    simulator._lightgbm_prediction_frames = lambda rows: {
+        "team_a_goals": rows,
+        "team_b_goals": rows,
+        "result": rows,
+        "xg_result": rows,
+    }
 
     prediction = simulator.lightgbm_prediction(
         "Sweden",
@@ -85,6 +95,40 @@ def test_lightgbm_prediction_bypasses_cache_when_group_table_is_provided() -> No
     np.testing.assert_allclose(
         prediction["probabilities"],
         np.array([0.55, 0.25, 0.20]),
+    )
+
+
+def test_lightgbm_prediction_blends_xg_result_classifier() -> None:
+    simulator = WorldCup2026Simulator.__new__(WorldCup2026Simulator)
+    simulator.prediction_cache = {}
+    simulator.lightgbm_model = {
+        "team_a_goals_model": _FakeModel([1.3]),
+        "team_b_goals_model": _FakeModel([0.9]),
+        "result_model": _FakeModel([[0.2, 0.3, 0.5]]),
+        "xg_result_model": _FakeModel([[0.4, 0.2, 0.4]]),
+        "result_probability_blend_weight": 0.5,
+    }
+    simulator._cache_key = lambda *args: args
+    simulator._lightgbm_features = lambda *args, **kwargs: {"feature": 1.0}
+    simulator._lightgbm_prediction_frames = lambda rows: {
+        "team_a_goals": rows,
+        "team_b_goals": rows,
+        "result": rows,
+        "xg_result": rows,
+    }
+
+    prediction = simulator.lightgbm_prediction(
+        "France",
+        "Morocco",
+        date(2026, 7, 10),
+        "QUARTER_FINALS",
+    )
+
+    assert prediction["team_a_goals"] == 1.3
+    assert prediction["team_b_goals"] == 0.9
+    np.testing.assert_allclose(
+        prediction["probabilities"],
+        np.array([0.3, 0.25, 0.45]),
     )
 
 

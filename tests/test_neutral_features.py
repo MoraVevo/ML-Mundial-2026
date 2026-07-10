@@ -5,15 +5,16 @@ import pandas as pd
 from kinela.lightgbm_model import (
     NEUTRAL_FEATURES,
     NEUTRAL_MODEL_RECIPE,
+    NEUTRAL_RESULT_FEATURES,
     _calibrated_classifier_importances,
     add_neutral_treated_features,
 )
 
 
-def test_default_neutral_recipe_is_v6_score_timing_without_clinical() -> None:
+def test_default_neutral_recipe_is_v9_xg_probability_ensemble() -> None:
     assert (
         NEUTRAL_MODEL_RECIPE
-        == "neutral_worldcup_v7_conservative_depth4_score_timing_no_clinical_no_script"
+        == "neutral_worldcup_v9_conservative_depth4_fotmob_xg_probability_ensemble"
     )
     assert NEUTRAL_FEATURES == [
         "competition_family",
@@ -26,6 +27,11 @@ def test_default_neutral_recipe_is_v6_score_timing_without_clinical() -> None:
         "rating_guardrail_edge",
         "club_star_finisher_edge",
         "worldcup_fotmob_current_story_edge",
+    ]
+    assert NEUTRAL_RESULT_FEATURES == [
+        *NEUTRAL_FEATURES,
+        "worldcup_fotmob_xg_matchup_team_a",
+        "worldcup_fotmob_xg_matchup_team_b",
     ]
     assert "match_script_compatibility_edge" not in NEUTRAL_FEATURES
     assert "clinical_low_block_matchup_edge" not in NEUTRAL_FEATURES
@@ -551,12 +557,16 @@ def test_current_worldcup_fotmob_story_requires_bilateral_coverage() -> None:
     assert treated.loc[0, "worldcup_fotmob_current_unrewarded_pressure_edge"] > 0.0
     assert treated.loc[0, "worldcup_fotmob_current_controlled_dominance_edge"] > 0.0
     assert treated.loc[0, "worldcup_fotmob_current_story_edge"] > 0.0
-    expected_story = (
-        0.44 * treated.loc[0, "worldcup_fotmob_current_controlled_dominance_edge"]
-        + 0.24 * treated.loc[0, "worldcup_fotmob_current_chance_pressure_edge"]
+    current_story = (
+        0.52 * treated.loc[0, "worldcup_fotmob_current_controlled_dominance_edge"]
+        + 0.20 * treated.loc[0, "worldcup_fotmob_current_chance_pressure_edge"]
         + 0.18 * treated.loc[0, "worldcup_fotmob_current_low_block_solution_edge"]
-        + 0.08 * treated.loc[0, "worldcup_fotmob_current_transition_punch_edge"]
-        + 0.06 * treated.loc[0, "worldcup_fotmob_current_unrewarded_pressure_edge"]
+        + 0.07 * treated.loc[0, "worldcup_fotmob_current_transition_punch_edge"]
+        + 0.03 * treated.loc[0, "worldcup_fotmob_current_unrewarded_pressure_edge"]
+    )
+    expected_story = (
+        0.55 * treated.loc[0, "worldcup_fotmob_interpreted_edge"]
+        + 0.45 * current_story
     )
     assert math.isclose(
         treated.loc[0, "worldcup_fotmob_current_story_edge"],
@@ -570,3 +580,56 @@ def test_current_worldcup_fotmob_story_requires_bilateral_coverage() -> None:
     assert treated.loc[1, "worldcup_fotmob_current_controlled_dominance_edge"] == 0.0
     assert treated.loc[1, "worldcup_fotmob_current_story_edge"] == 0.0
     assert "worldcup_fotmob_current_story_edge" in NEUTRAL_FEATURES
+
+
+def test_xg_matchup_uses_prior_worldcup_creation_and_opponent_concession() -> None:
+    def xg_columns(prefix: str, *, xg: float, xgc: float, coverage: float) -> dict[str, float]:
+        return {
+            f"team_a_{prefix}_recent6_fotmob_expected_goals": xg,
+            f"team_a_{prefix}_recent6_fotmob_expected_goals_conceded": xgc,
+            f"team_a_{prefix}_recent6_fotmob_detail_coverage": coverage,
+        }
+
+    frame = pd.DataFrame(
+        [
+            {
+                **xg_columns("worldcup", xg=2.0, xgc=0.6, coverage=1.0),
+                "team_b_worldcup_recent6_fotmob_expected_goals": 0.8,
+                "team_b_worldcup_recent6_fotmob_expected_goals_conceded": 1.4,
+                "team_b_worldcup_recent6_fotmob_detail_coverage": 1.0,
+                **xg_columns("current_worldcup", xg=1.8, xgc=0.7, coverage=1.0),
+                "team_b_current_worldcup_recent6_fotmob_expected_goals": 0.9,
+                "team_b_current_worldcup_recent6_fotmob_expected_goals_conceded": 1.2,
+                "team_b_current_worldcup_recent6_fotmob_detail_coverage": 1.0,
+            },
+            {
+                **xg_columns("worldcup", xg=2.0, xgc=0.6, coverage=0.0),
+                "team_b_worldcup_recent6_fotmob_expected_goals": 0.8,
+                "team_b_worldcup_recent6_fotmob_expected_goals_conceded": 1.4,
+                "team_b_worldcup_recent6_fotmob_detail_coverage": 0.0,
+                **xg_columns("current_worldcup", xg=1.8, xgc=0.7, coverage=0.0),
+                "team_b_current_worldcup_recent6_fotmob_expected_goals": 0.9,
+                "team_b_current_worldcup_recent6_fotmob_expected_goals_conceded": 1.2,
+                "team_b_current_worldcup_recent6_fotmob_detail_coverage": 0.0,
+            },
+        ]
+    )
+
+    treated = add_neutral_treated_features(frame)
+
+    history_a = 0.50 * (2.0 + 1.4)
+    history_b = 0.50 * (0.8 + 0.6)
+    current_a = 0.50 * (1.8 + 1.2)
+    current_b = 0.50 * (0.9 + 0.7)
+    assert math.isclose(
+        treated.loc[0, "worldcup_fotmob_xg_matchup_team_a"],
+        0.55 * history_a + 0.45 * current_a,
+        rel_tol=1e-12,
+    )
+    assert math.isclose(
+        treated.loc[0, "worldcup_fotmob_xg_matchup_team_b"],
+        0.55 * history_b + 0.45 * current_b,
+        rel_tol=1e-12,
+    )
+    assert treated.loc[1, "worldcup_fotmob_xg_matchup_team_a"] == 0.0
+    assert treated.loc[1, "worldcup_fotmob_xg_matchup_team_b"] == 0.0
