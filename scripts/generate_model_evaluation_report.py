@@ -24,6 +24,7 @@ from sklearn.metrics import (  # noqa: E402
 
 from kinela.lightgbm_model import (  # noqa: E402
     CATEGORICAL_FEATURES,
+    NEUTRAL_BASE_RESULT_FEATURES,
     NEUTRAL_GOAL_FEATURES,
     NEUTRAL_MODEL_RECIPE,
     NEUTRAL_RESULT_FEATURES,
@@ -280,9 +281,11 @@ def _evaluate(
         raise RuntimeError(f"{name} produced an empty train or test split")
 
     goal_features = list(NEUTRAL_GOAL_FEATURES)
+    base_result_features = list(NEUTRAL_BASE_RESULT_FEATURES)
     result_features = list(NEUTRAL_RESULT_FEATURES)
     categorical = [feature for feature in CATEGORICAL_FEATURES if feature in goal_features]
     result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in result_features]
+    base_result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in base_result_features]
     weights = train["match_recency_weight"].astype(float).to_numpy(copy=True)
 
     team_a_model = lgb.LGBMRegressor(**REG_PARAMS)
@@ -308,10 +311,10 @@ def _evaluate(
         cv=3,
     )
     base_classifier.fit(
-        train[goal_features],
+        train[base_result_features],
         train["result_label"],
         sample_weight=weights,
-        categorical_feature=categorical,
+        categorical_feature=base_result_categorical,
     )
     xg_classifier = CalibratedClassifierCV(
         lgb.LGBMClassifier(**CLF_PARAMS),
@@ -325,7 +328,7 @@ def _evaluate(
         categorical_feature=result_categorical,
     )
     probabilities = blend_result_probabilities(
-        base_classifier.predict_proba(test[goal_features]),
+        base_classifier.predict_proba(test[base_result_features]),
         xg_classifier.predict_proba(test[result_features]),
     )
     labels = test["result_label"].astype(int).to_numpy()

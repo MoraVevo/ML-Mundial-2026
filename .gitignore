@@ -32,6 +32,7 @@ scripts/*
 !scripts/run_worldcup2026_consensus_bracket.py
 !scripts/train_worldcup2026_holdout_model.py
 !scripts/update_worldcup2026_manual_detail_from_espn.py
+!scripts/update_worldcup2026_aet_90min_from_fotmob.py
 !scripts/update_worldcup2026_manual_detail_from_thescore.py
 !scripts/generate_model_evaluation_report.py
 !scripts/create_portable_bundle.py

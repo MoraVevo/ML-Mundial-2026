@@ -2037,6 +2037,7 @@ class WorldCup2026Simulator:
             winner = manual_result["winner"]
             decided_by = "manual_result"
             penalty_winner = manual_result.get("penalty_winner")
+            extra_time_winner = manual_result.get("extra_time_winner")
             penalty_probability_a = None
             if not winner:
                 winner = team_a if a_goals > b_goals else team_b if b_goals > a_goals else None
@@ -2048,6 +2049,13 @@ class WorldCup2026Simulator:
                 winner = penalty_winner
                 decided_by = "manual_penalties"
                 penalty_probability_a = self.penalty_model.team_a_probability(team_a, team_b, match_date)
+            elif (
+                winner == "Draw"
+                and stage != "GROUP_STAGE"
+                and extra_time_winner in {team_a, team_b}
+            ):
+                winner = extra_time_winner
+                decided_by = "manual_extra_time"
             self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
             self._record_match_trace(
                 match_id,

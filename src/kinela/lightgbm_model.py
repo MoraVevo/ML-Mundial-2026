@@ -326,11 +326,12 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "worldcup_fotmob_current_story_edge",
 ]
 NEUTRAL_GOAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
+NEUTRAL_BASE_RESULT_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
 NEUTRAL_XG_RESULT_FEATURES = [
     "worldcup_fotmob_xg_matchup_team_a",
     "worldcup_fotmob_xg_matchup_team_b",
 ]
-NEUTRAL_RESULT_FEATURES = [*NEUTRAL_GOAL_FEATURES, *NEUTRAL_XG_RESULT_FEATURES]
+NEUTRAL_RESULT_FEATURES = [*NEUTRAL_BASE_RESULT_FEATURES, *NEUTRAL_XG_RESULT_FEATURES]
 NEUTRAL_XG_RESULT_BLEND_WEIGHT = 0.50
 NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v9_conservative_depth4_fotmob_xg_probability_ensemble"
 # Legacy callers use this list for the two goal regressors. The result
@@ -2781,12 +2782,18 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
     train = neutral_frame[neutral_frame["split"] == "train"].copy()
     test = neutral_frame[neutral_frame["split"] == "test"].copy()
     goal_features = list(NEUTRAL_GOAL_FEATURES)
+    base_result_features = list(NEUTRAL_BASE_RESULT_FEATURES)
     result_features = list(NEUTRAL_RESULT_FEATURES)
     x_train = train[goal_features]
     x_test = test[goal_features]
+    base_result_x_train = train[base_result_features]
+    base_result_x_test = test[base_result_features]
     result_x_train = train[result_features]
     result_x_test = test[result_features]
     categorical = [feature for feature in CATEGORICAL_FEATURES if feature in goal_features]
+    base_result_categorical = [
+        feature for feature in CATEGORICAL_FEATURES if feature in base_result_features
+    ]
     result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in result_features]
     train_weights = train["match_recency_weight"].astype(float).to_numpy()
 
@@ -2839,10 +2846,10 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
     )
     calibrated = CalibratedClassifierCV(clf, method="sigmoid", cv=3)
     calibrated.fit(
-        x_train,
+        base_result_x_train,
         train["result_label"],
         sample_weight=train_weights,
-        categorical_feature=categorical,
+        categorical_feature=base_result_categorical,
     )
     xg_classifier = CalibratedClassifierCV(
         lgb.LGBMClassifier(
@@ -2870,7 +2877,7 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
         categorical_feature=result_categorical,
     )
     probabilities = blend_result_probabilities(
-        calibrated.predict_proba(x_test),
+        calibrated.predict_proba(base_result_x_test),
         xg_classifier.predict_proba(result_x_test),
     )
     predicted_labels = probabilities.argmax(axis=1)
@@ -2905,8 +2912,8 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
             "xg_result_model": xg_classifier,
             "features": goal_features,
             "team_a_goal_features": goal_features,
-            "team_b_goal_features": goal_features,
-            "result_features": goal_features,
+        "team_b_goal_features": goal_features,
+        "result_features": base_result_features,
             "xg_result_features": result_features,
             "result_probability_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
             "model_id": NEUTRAL_MODEL_RECIPE,

@@ -22,6 +22,7 @@ if str(ROOT / "scripts") not in sys.path:
 from generate_model_evaluation_report import CLF_PARAMS, REG_PARAMS, _prepare_neutral  # noqa: E402
 from kinela.lightgbm_model import (  # noqa: E402
     CATEGORICAL_FEATURES,
+    NEUTRAL_BASE_RESULT_FEATURES,
     NEUTRAL_GOAL_FEATURES,
     NEUTRAL_MODEL_RECIPE,
     NEUTRAL_RESULT_FEATURES,
@@ -62,9 +63,11 @@ def train_all_played_model(data_root: Path) -> tuple[dict[str, Any], dict[str, A
         raise RuntimeError("All-played training split produced no rows")
 
     goal_features = list(NEUTRAL_GOAL_FEATURES)
+    base_result_features = list(NEUTRAL_BASE_RESULT_FEATURES)
     result_features = list(NEUTRAL_RESULT_FEATURES)
     categorical = [feature for feature in CATEGORICAL_FEATURES if feature in goal_features]
     result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in result_features]
+    base_result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in base_result_features]
     weights = train["match_recency_weight"].astype(float).to_numpy(copy=True)
 
     team_a_model = lgb.LGBMRegressor(**REG_PARAMS)
@@ -88,10 +91,10 @@ def train_all_played_model(data_root: Path) -> tuple[dict[str, Any], dict[str, A
         cv=3,
     )
     result_model.fit(
-        train[goal_features],
+        train[base_result_features],
         train["result_label"],
         sample_weight=weights,
-        categorical_feature=categorical,
+        categorical_feature=base_result_categorical,
     )
     xg_result_model = CalibratedClassifierCV(
         lgb.LGBMClassifier(**CLF_PARAMS),
@@ -123,7 +126,7 @@ def train_all_played_model(data_root: Path) -> tuple[dict[str, Any], dict[str, A
         "features": goal_features,
         "team_a_goal_features": goal_features,
         "team_b_goal_features": goal_features,
-        "result_features": goal_features,
+        "result_features": base_result_features,
         "xg_result_features": result_features,
         "result_probability_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
         "model_id": model_id,
