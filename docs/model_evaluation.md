@@ -1,8 +1,33 @@
 # Evaluacion del modelo
 
-Este reporte evalua el modelo neutral con cortes temporales disenados para que los partidos de test no entren al entrenamiento.
+Este reporte conserva los cortes temporales historicos y documenta tambien el
+artefacto activo de produccion. Los partidos de test nunca entran al
+entrenamiento.
 
-Identificador del modelo: `neutral_worldcup_v9_conservative_depth4_fotmob_xg_probability_ensemble`
+## Estado de produccion (v10, actualizado al 2026-07-11)
+
+Identificador holdout: `neutral_worldcup_v10_fifa_sum_live_no_custom_elo_depth4_fotmob_xg_probability_ensemble_worldcup_2026_holdout`.
+
+El holdout del Mundial tiene 100 partidos, 67 aciertos (67.00%), log-loss
+0.8688 y MAE medio de goles 0.8975. El artefacto `all_played` usa 887 partidos
+completados, incluidos los 100 partidos del Mundial ya jugados hasta el
+2026-07-11, para predecir los cruces restantes.
+
+La receta activa tiene 9 features para los regresores de goles y 11 para el
+clasificador de resultado: las dos features adicionales son el xG de matchup,
+mezclado 50/50 con el clasificador base. FIFA SUM Live es la unica señal activa
+de fuerza; el Elo interno queda como diagnóstico y no se suma a la receta.
+
+La fase eliminatoria se modela en dos capas posteriores al resultado de 90
+minutos. Un empate pasa por un Poisson de prorroga entrenado con eventos
+StatsBomb de periodos 3/4 (29 partidos, 18 goles; lambda 0.621). Si sigue
+empatado, se usa el artefacto de penales 50/50. Los goles de prorroga se
+guardan separados y no contaminan historial ni features de 90 minutos.
+
+Las tablas inferiores son el reporte historico v9 que genero los graficos
+versionados; no deben interpretarse como metricas actuales de v10.
+
+Identificador historico: `neutral_worldcup_v9_conservative_depth4_fotmob_xg_probability_ensemble`
 
 ## Politicas de test
 
@@ -215,7 +240,9 @@ Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven
 
 ## Construccion de features
 
-El modelo activo usa 10 features prepartido en su base y 12 en el clasificador xG paralelo (mezcla de probabilidades 50%/50%).
+El reporte historico v9 usaba 10 features prepartido en su base y 12 en el
+clasificador xG paralelo (mezcla de probabilidades 50%/50%). La receta activa
+v10 esta descrita arriba y redujo la base a 9 features y el clasificador a 11.
 
 | Feature | Significado |
 |---|---|

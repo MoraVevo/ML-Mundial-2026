@@ -180,6 +180,7 @@ def test_fifa_point_baselines_separate_direct_prediction_from_tournament_replay(
             "away_team": "Morocco",
             "home_goals": 1,
             "away_goals": 0,
+            "stage_or_round": "GROUP_STAGE",
         }
     ]
 
@@ -210,6 +211,7 @@ def test_refresh_derived_state_rebuilds_fifa_baselines_and_clears_cache() -> Non
             "away_team": "Morocco",
             "home_goals": 1,
             "away_goals": 0,
+            "stage_or_round": "GROUP_STAGE",
         }
     ]
     simulator.simulated_histories = {"france": [{"gf": 1}]}

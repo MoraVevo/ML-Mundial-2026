@@ -188,6 +188,8 @@ def _run_simulation_counts(
     slot_matchups: dict[str, Counter[tuple[str, str]]] = defaultdict(Counter)
     slot_winners: dict[str, Counter[str]] = defaultdict(Counter)
     slot_matchup_winners: dict[str, dict[tuple[str, str], Counter[str]]] = defaultdict(dict)
+    remaining_decision_modes: Counter[str] = Counter()
+    remaining_slot_decision_modes: dict[str, Counter[str]] = defaultdict(Counter)
     full_brackets: Counter[tuple[tuple[str, str, str, str, str], ...]] = Counter()
 
     started = datetime.now()
@@ -225,6 +227,10 @@ def _run_simulation_counts(
             slot_matchups[match_id][matchup] += 1
             slot_winners[match_id][row["winner"]] += 1
             slot_matchup_winners[match_id].setdefault(matchup, Counter())[row["winner"]] += 1
+            if match_id in {"101", "102", "103", "104"}:
+                decision_mode = str(row.get("decided_by") or "regular")
+                remaining_decision_modes[decision_mode] += 1
+                remaining_slot_decision_modes[match_id][decision_mode] += 1
 
         if progress_every and index % progress_every == 0:
             elapsed = (datetime.now() - started).total_seconds()
@@ -252,6 +258,8 @@ def _run_simulation_counts(
         "slot_matchups": slot_matchups,
         "slot_winners": slot_winners,
         "slot_matchup_winners": slot_matchup_winners,
+        "remaining_decision_modes": remaining_decision_modes,
+        "remaining_slot_decision_modes": remaining_slot_decision_modes,
         "full_brackets": full_brackets,
     }
 
@@ -266,6 +274,7 @@ def _merge_counts(target: dict[str, Any], source: dict[str, Any]) -> None:
         "third",
         "fourth",
         "best_thirds",
+        "remaining_decision_modes",
         "full_brackets",
     ):
         target[key].update(source[key])
@@ -279,6 +288,8 @@ def _merge_counts(target: dict[str, Any], source: dict[str, Any]) -> None:
         target_matchup_winners = target["slot_matchup_winners"][match_id]
         for matchup, counter in matchup_winners.items():
             target_matchup_winners.setdefault(matchup, Counter()).update(counter)
+    for match_id, counter in source["remaining_slot_decision_modes"].items():
+        target["remaining_slot_decision_modes"][match_id].update(counter)
 
 
 def _empty_counts() -> dict[str, Any]:
@@ -295,6 +306,8 @@ def _empty_counts() -> dict[str, Any]:
         "slot_matchups": defaultdict(Counter),
         "slot_winners": defaultdict(Counter),
         "slot_matchup_winners": defaultdict(dict),
+        "remaining_decision_modes": Counter(),
+        "remaining_slot_decision_modes": defaultdict(Counter),
         "full_brackets": Counter(),
     }
 
@@ -334,6 +347,8 @@ def _summarize_counts(
     slot_matchups = counts["slot_matchups"]
     slot_winners = counts["slot_winners"]
     slot_matchup_winners = counts["slot_matchup_winners"]
+    remaining_decision_modes = counts["remaining_decision_modes"]
+    remaining_slot_decision_modes = counts["remaining_slot_decision_modes"]
     full_brackets = counts["full_brackets"]
 
     teams = sorted(
@@ -381,8 +396,8 @@ def _summarize_counts(
             "model_path": selected_model_path,
             "model_label": model_label,
             "model_note": (
-                "Neutral LightGBM; World Cup simulation uses advancement "
-                "after penalties in knockouts."
+                "Neutral LightGBM for 90 minutes; verified extra-time Poisson layer, "
+                "then the selected penalty model if still tied."
             ),
             "accuracy_reference": "Played World Cup 2026 held-out evaluation used by the project.",
             "third_place_assignment": "exact_495_combination_table",
@@ -414,6 +429,22 @@ def _summarize_counts(
             for team, counter in sorted(group_positions.items())
         },
         "slot_summary": slot_summary,
+        "remaining_match_decision_modes": {
+            "overall": {
+                mode: {
+                    "count": count,
+                    "probability_per_remaining_match": round(count / (4 * runs), 6),
+                }
+                for mode, count in remaining_decision_modes.most_common()
+            },
+            "by_match": {
+                match_id: {
+                    mode: {"count": count, "probability": round(count / runs, 6)}
+                    for mode, count in counter.most_common()
+                }
+                for match_id, counter in sorted(remaining_slot_decision_modes.items())
+            },
+        },
         "most_frequent_full_bracket": _signature_to_rows(most_common_signature, support, runs),
     }
 

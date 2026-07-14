@@ -321,7 +321,6 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "goal_balance_edge",
     "draw_pressure_index",
     "score_timing_edge",
-    "rating_guardrail_edge",
     "club_star_finisher_edge",
     "worldcup_fotmob_current_story_edge",
 ]
@@ -333,7 +332,9 @@ NEUTRAL_XG_RESULT_FEATURES = [
 ]
 NEUTRAL_RESULT_FEATURES = [*NEUTRAL_BASE_RESULT_FEATURES, *NEUTRAL_XG_RESULT_FEATURES]
 NEUTRAL_XG_RESULT_BLEND_WEIGHT = 0.50
-NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v9_conservative_depth4_fotmob_xg_probability_ensemble"
+NEUTRAL_MODEL_RECIPE = (
+    "neutral_worldcup_v10_fifa_sum_live_no_custom_elo_depth4_fotmob_xg_probability_ensemble"
+)
 # Legacy callers use this list for the two goal regressors. The result
 # classifier receives the separate, small xG feature list above.
 NEUTRAL_FEATURES = NEUTRAL_GOAL_FEATURES
@@ -535,15 +536,18 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
     ) + 0.50 * (
         _num_series(out, "recent6_goals_for_diff") - _num_series(out, "recent6_goals_against_diff")
     )
-    # Keep plain recent points as an exported diagnostic. The direct active
-    # form signal remains opponent-adjusted because clean, deduplicated World
-    # Cup validation shows that it generalizes better across cumulative
-    # windows. It also supplies the contextual form term used for draw parity.
+    # Plain recent points are the active form signal and also supply the
+    # contextual form term used for draw parity. The legacy opponent-adjusted
+    # value stays exported only for ablation diagnostics.
     out["recent_points_form_edge"] = _num_series(out, "recent6_points_diff")
-    out["quality_form_edge"] = _num_series(
+    out["opponent_adjusted_quality_form_edge"] = _num_series(
         out,
         "recent6_quality_result_points_diff",
     )
+    # Production uses an interpretable, provider-independent recent-points
+    # signal.  The opponent-adjusted version depends on the project's custom
+    # Elo and remains diagnostic only.
+    out["quality_form_edge"] = out["recent_points_form_edge"]
     out["historical_rating_threat_edge"] = 0.52 * out[
         "historical_rating_consensus_edge"
     ] + 0.48 * np.tanh(out["threat_edge"] / 1.25)
@@ -551,11 +555,13 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
         out["historical_fifa_anchor_edge"]
         - out["historical_rating_threat_edge"]
     )
-    # Model-facing rating features must use only rankings available before the
-    # match. For future simulations the historical inputs fall back to the
-    # current ranking, so training and inference retain the same definition.
-    out["rating_threat_edge"] = out["historical_rating_threat_edge"]
-    out["rating_guardrail_edge"] = out["historical_rating_guardrail_edge"]
+    # Keep one model-facing strength signal: FIFA SUM live points available
+    # immediately before the match. Rank is determined by those same points,
+    # and the project's separate Elo would duplicate another Elo-style update.
+    out["rating_threat_edge"] = historical_fifa_pair_observed * np.tanh(
+        live_fifa_points_diff / 190.0
+    )
+    out["rating_guardrail_edge"] = 0.0
     out["rating_drift_edge"] = out["live_fifa_anchor_edge"] - out[
         "historical_fifa_anchor_edge"
     ]
@@ -583,7 +589,7 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
         0.55 * fouls_volume + 0.30 * cards_volume + 0.15 * physical_imbalance
     )
     control_quality_edge = (
-        0.40 * out["historical_rating_consensus_edge"]
+        0.40 * out["rating_threat_edge"]
         + 0.30 * np.tanh(out["threat_edge"] / 1.25)
         + 0.20 * np.tanh(out["quality_form_edge"] / 1.8)
         + 0.10 * np.tanh(out["goal_balance_edge"] / 1.5)

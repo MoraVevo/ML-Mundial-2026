@@ -33,6 +33,11 @@ necesario para correr simulaciones:
 - fixture del Mundial en `data/raw/football_data/competitions/WC`
 - metadata del modelo all-played si existe
 
+`data/static` incluye tambien los artefactos portables de tandas de penales y
+prorroga (`penalty_shootout_model.json` y `extra_time_model.json`). La
+simulacion conserva los goles de 90 minutos separados de los goles de periodos
+3/4; no hace falta volver a recolectar StatsBomb para cargar esos artefactos.
+
 Ese ZIP deberia ser mucho mas liviano que copiar todo `data/raw`.
 
 Si se quiere mover absolutamente todo el cache crudo para poder renormalizar sin
@@ -85,7 +90,7 @@ Para una prueba mas fuerte, que ademas corre una simulacion completa:
 ## 5. Correr la simulacion larga
 
 ```cmd
-.venv\Scripts\python scripts\run_worldcup2026_consensus_bracket.py --runs 5000 --workers 8 --seed 42 --progress-every 25 --model-path data\models\lightgbm_neutral_all_played_wc2026.joblib --model-label all_played_wc2026_v7_full_context_5000 --output outputs\worldcup2026_consensus_bracket_5000_nueva_pc.json
+.venv\Scripts\python scripts\run_worldcup2026_consensus_bracket.py --runs 5000 --workers 8 --seed 42 --progress-every 25 --model-path data\models\lightgbm_neutral_all_played_wc2026.joblib --model-label all_played_wc2026_v10_extra_time_5000 --output outputs\worldcup2026_consensus_bracket_5000_nueva_pc.json
 ```
 
 El script imprime progreso cada 25 iteraciones con los tres campeones mas

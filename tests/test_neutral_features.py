@@ -11,10 +11,10 @@ from kinela.lightgbm_model import (
 )
 
 
-def test_default_neutral_recipe_is_v9_xg_probability_ensemble() -> None:
+def test_default_neutral_recipe_is_v10_fifa_sum_live_without_custom_elo() -> None:
     assert (
         NEUTRAL_MODEL_RECIPE
-        == "neutral_worldcup_v9_conservative_depth4_fotmob_xg_probability_ensemble"
+        == "neutral_worldcup_v10_fifa_sum_live_no_custom_elo_depth4_fotmob_xg_probability_ensemble"
     )
     assert NEUTRAL_FEATURES == [
         "competition_family",
@@ -24,7 +24,6 @@ def test_default_neutral_recipe_is_v9_xg_probability_ensemble() -> None:
         "goal_balance_edge",
         "draw_pressure_index",
         "score_timing_edge",
-        "rating_guardrail_edge",
         "club_star_finisher_edge",
         "worldcup_fotmob_current_story_edge",
     ]
@@ -37,7 +36,7 @@ def test_default_neutral_recipe_is_v9_xg_probability_ensemble() -> None:
     assert "clinical_low_block_matchup_edge" not in NEUTRAL_FEATURES
 
 
-def test_rating_threat_uses_historical_pre_match_ranking() -> None:
+def test_rating_threat_uses_single_observed_fifa_sum_live_signal() -> None:
     frame = pd.DataFrame(
         [
             {
@@ -60,14 +59,12 @@ def test_rating_threat_uses_historical_pre_match_ranking() -> None:
 
     treated = add_neutral_treated_features(frame)
 
-    assert treated.loc[0, "rating_threat_edge"] == treated.loc[
-        0,
-        "historical_rating_threat_edge",
-    ]
-    assert treated.loc[0, "rating_guardrail_edge"] == treated.loc[
-        0,
-        "historical_rating_guardrail_edge",
-    ]
+    assert math.isclose(
+        treated.loc[0, "rating_threat_edge"],
+        math.tanh(-180.0 / 190.0),
+        rel_tol=1e-12,
+    )
+    assert treated.loc[0, "rating_guardrail_edge"] == 0.0
     assert treated.loc[0, "rating_drift_edge"] == (
         treated.loc[0, "live_fifa_anchor_edge"]
         - treated.loc[0, "historical_fifa_anchor_edge"]
@@ -77,7 +74,7 @@ def test_rating_threat_uses_historical_pre_match_ranking() -> None:
     assert "worldcup_points_memory_edge" not in NEUTRAL_FEATURES
 
 
-def test_recent_points_form_is_direct_and_quality_form_remains_contextual() -> None:
+def test_quality_form_is_plain_recent_points_without_custom_elo() -> None:
     frame = pd.DataFrame(
         [
             {
@@ -91,7 +88,8 @@ def test_recent_points_form_is_direct_and_quality_form_remains_contextual() -> N
     treated = add_neutral_treated_features(frame)
 
     assert treated.loc[0, "recent_points_form_edge"] == -0.25
-    assert treated.loc[0, "quality_form_edge"] == 0.75
+    assert treated.loc[0, "quality_form_edge"] == -0.25
+    assert treated.loc[0, "opponent_adjusted_quality_form_edge"] == 0.75
     assert "quality_form_edge" in NEUTRAL_FEATURES
     assert "recent_points_form_edge" not in NEUTRAL_FEATURES
 
@@ -208,13 +206,10 @@ def test_rating_guardrail_neutralises_missing_fifa_ranking() -> None:
     assert treated.loc[0, "historical_fifa_anchor_edge"] == 0.0
     assert treated.loc[0, "live_fifa_anchor_edge"] == 0.0
     assert treated.loc[0, "rating_drift_edge"] == 0.0
-    assert treated.loc[0, "rating_guardrail_edge"] == -treated.loc[
-        0,
-        "rating_threat_edge",
-    ]
+    assert treated.loc[0, "rating_guardrail_edge"] == 0.0
 
 
-def test_rating_guardrail_is_fifa_disagreement_not_duplicate_blend() -> None:
+def test_rating_guardrail_is_disabled_to_avoid_duplicate_rating_signal() -> None:
     frame = pd.DataFrame(
         [
             {
@@ -229,12 +224,8 @@ def test_rating_guardrail_is_fifa_disagreement_not_duplicate_blend() -> None:
 
     treated = add_neutral_treated_features(frame)
 
-    assert math.isclose(
-        treated.loc[0, "rating_guardrail_edge"],
-        treated.loc[0, "historical_fifa_anchor_edge"]
-        - treated.loc[0, "rating_threat_edge"],
-        rel_tol=1e-12,
-    )
+    assert treated.loc[0, "rating_guardrail_edge"] == 0.0
+    assert "rating_guardrail_edge" not in NEUTRAL_FEATURES
 
 
 def test_match_script_active_signal_uses_bilateral_quality_adjustment() -> None:

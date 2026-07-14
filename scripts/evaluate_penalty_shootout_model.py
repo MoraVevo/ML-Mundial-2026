@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import sys
 from datetime import date
 from pathlib import Path
@@ -64,17 +65,22 @@ def _evaluate_rows(
     rows: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     details: list[dict[str, Any]] = []
-    correct = 0
+    decisive_correct = 0
+    ties = 0
     for row in rows:
         probability_a = simulator.penalty_model.team_a_probability(
             row["team_a"],
             row["team_b"],
             row["date"],
         )
-        predicted_winner = row["team_a"] if probability_a >= 0.5 else row["team_b"]
+        tied = math.isclose(probability_a, 0.5, abs_tol=1e-12)
+        predicted_winner = (
+            None if tied else row["team_a"] if probability_a > 0.5 else row["team_b"]
+        )
         actual_winner = row["penalty_winner"]
-        is_correct = predicted_winner == actual_winner
-        correct += int(is_correct)
+        is_correct = None if tied else predicted_winner == actual_winner
+        ties += int(tied)
+        decisive_correct += int(bool(is_correct))
         details.append(
             {
                 "date": row["date"].isoformat(),
@@ -86,17 +92,20 @@ def _evaluate_rows(
                 "team_b_penalty_goals": row["team_b_penalty_goals"],
                 "actual_winner": actual_winner,
                 "predicted_winner": predicted_winner,
-                "correct": int(is_correct),
+                "correct": int(is_correct) if is_correct is not None else None,
                 "prob_team_a": round(float(probability_a), 6),
                 "prob_team_b": round(float(1.0 - probability_a), 6),
             }
         )
     matches = len(rows)
+    expected_correct = decisive_correct + 0.5 * ties
     return (
         {
             "matches": matches,
-            "correct": correct,
-            "accuracy": round(correct / matches, 4) if matches else None,
+            "decisive_predictions": matches - ties,
+            "unresolved_50_50_predictions": ties,
+            "expected_correct": expected_correct,
+            "accuracy": round(expected_correct / matches, 4) if matches else None,
             "avg_favorite_probability": round(
                 sum(max(item["prob_team_a"], item["prob_team_b"]) for item in details) / matches,
                 4,
@@ -109,7 +118,7 @@ def _evaluate_rows(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Audit the World Cup penalty shootout fallback model.")
+    parser = argparse.ArgumentParser(description="Audit the production penalty shootout model.")
     parser.add_argument("--data-root", type=Path, default=Path("data"))
     parser.add_argument(
         "--output",
@@ -119,6 +128,14 @@ def main() -> None:
     args = parser.parse_args()
 
     simulator = WorldCup2026Simulator(args.data_root, seed=42, engine="lightgbm")
+    artifact_path = args.data_root / "static" / "penalty_shootout_model.json"
+    artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+    temporal_report_path = Path("outputs/penalty_shootout_model_evaluation.json")
+    temporal_report = (
+        json.loads(temporal_report_path.read_text(encoding="utf-8"))
+        if temporal_report_path.exists()
+        else None
+    )
     historical_rows = _loaded_shootouts(simulator)
     manual_rows = _manual_worldcup_shootouts(args.data_root)
     combined_rows = sorted([*historical_rows, *manual_rows], key=lambda row: row["date"])
@@ -128,27 +145,17 @@ def main() -> None:
     combined_summary, combined_details = _evaluate_rows(simulator, combined_rows)
 
     payload = {
-        "model": "PenaltyShootoutModel fallback",
+        "model": artifact["model_id"],
         "implementation": (
-            "Uses only squad-quality difference from football-data squad profiles, passed "
-            "through a logistic function and clipped to 38%-62%. Loaded shootout history is "
-            "available in the simulator but is not currently used by team_a_probability."
+            "Neutral and symmetric model selected against an explicit 50/50 candidate on "
+            "pre-2018 temporal folds. The production artifact keeps 50/50 because every "
+            "fitted candidate had worse out-of-sample probabilistic scores."
         ),
-        "active_features": [
-            "squad_top11_competition_strength",
-            "squad_depth_competition_strength",
-            "squad_top5_competition_strength",
-            "known_strength_share",
-            "squad_elite_competition_share",
-            "player_availability_penalty",
-        ],
-        "inactive_loaded_context": [
-            "historical_penalty_shootout_scored_minus_conceded_last3",
-            "head_to_head_penalty_wins",
-        ],
-        "historical_loaded_shootouts": historical_summary,
-        "worldcup_2026_manual_shootouts": manual_summary,
-        "combined_diagnostic": combined_summary,
+        "active_features": artifact["features"],
+        "primary_temporal_evaluation": temporal_report,
+        "historical_loaded_shootouts_in_sample_diagnostic": historical_summary,
+        "worldcup_2026_manual_shootouts_diagnostic": manual_summary,
+        "combined_in_sample_diagnostic": combined_summary,
         "details": combined_details,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

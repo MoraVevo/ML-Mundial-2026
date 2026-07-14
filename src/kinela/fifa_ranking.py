@@ -379,3 +379,55 @@ def update_live_fifa_points(
         * (actual_a - expected_a)
     )
     return team_a_points + change, team_b_points - change
+
+
+def update_fifa_sum_points(
+    team_a_points: float,
+    team_b_points: float,
+    *,
+    team_a_result: float,
+    team_b_result: float,
+    importance: float,
+    protect_negative: bool = False,
+) -> tuple[float, float]:
+    """Apply FIFA's published SUM formula to one completed match.
+
+    Results are 1/0 for a normal win/loss, 0.5/0.5 for a draw and
+    0.75/0.5 for a penalty-shootout winner/loser.  Final-competition
+    knockout rounds protect each team independently from negative points.
+    """
+    expected_a = 1.0 / (10.0 ** (-(team_a_points - team_b_points) / 600.0) + 1.0)
+    expected_b = 1.0 - expected_a
+    change_a = max(0.0, float(importance)) * (float(team_a_result) - expected_a)
+    change_b = max(0.0, float(importance)) * (float(team_b_result) - expected_b)
+    if protect_negative:
+        change_a = max(0.0, change_a)
+        change_b = max(0.0, change_b)
+    return team_a_points + change_a, team_b_points + change_b
+
+
+def fifa_sum_match_importance(
+    competition_name: str,
+    competition_type: str,
+    stage_or_round: str,
+) -> float:
+    """Return FIFA SUM's published importance bucket for a national match."""
+    competition = (competition_name or "").casefold()
+    competition_kind = (competition_type or "").casefold()
+    stage = (stage_or_round or "").upper()
+    if competition == "fifa world cup":
+        return (
+            60.0
+            if stage in {"QUARTER_FINALS", "SEMI_FINALS", "THIRD_PLACE", "FINAL"}
+            else 50.0
+        )
+    if competition_kind == "qualifier":
+        return 25.0
+    if competition_kind == "friendly":
+        # The source data does not identify out-of-window friendlies reliably;
+        # use the official in-window value and retain this limitation in audits.
+        return 10.0
+    if "nations league" in competition:
+        return 15.0 if "GROUP" in stage else 25.0
+    knockout = any(marker in stage for marker in ("QUARTER", "SEMI", "FINAL"))
+    return 40.0 if knockout else 35.0

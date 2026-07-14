@@ -45,3 +45,8 @@ scripts/*
 !scripts/run_worldcup2026_fixed_r32_no_results.py
 !scripts/worldcup2026_walk_forward_retrain_evaluation.py
 !scripts/evaluate_penalty_shootout_model.py
+!scripts/worldcup2026_rating_signal_ablation.py
+!scripts/collect_penalty_shootout_data.py
+!scripts/train_penalty_shootout_model.py
+!scripts/collect_extra_time_data.py
+!scripts/train_extra_time_model.py
