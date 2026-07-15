@@ -213,10 +213,11 @@ def _simulate_once(
     for match_id, previous_a, previous_b in SEMI_FINALS:
         team_a = winners[previous_a]
         team_b = winners[previous_b]
+        semifinal_date = date(2026, 7, 14) if match_id == 101 else date(2026, 7, 15)
         _a_goals, _b_goals, winner = simulator.simulate_match(
             team_a,
             team_b,
-            KNOCKOUT_DATES["SEMI_FINALS"],
+            semifinal_date,
             "SEMI_FINALS",
             match_id=match_id,
         )

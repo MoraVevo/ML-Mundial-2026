@@ -2543,10 +2543,11 @@ class WorldCup2026Simulator:
         for match_id, previous_a, previous_b in SEMI_FINALS:
             team_a = winners[previous_a]
             team_b = winners[previous_b]
+            semifinal_date = date(2026, 7, 14) if match_id == 101 else date(2026, 7, 15)
             _, _, winner = self.simulate_match(
                 team_a,
                 team_b,
-                date(2026, 7, 14),
+                semifinal_date,
                 "SEMI_FINALS",
                 match_id=match_id,
             )
@@ -2751,7 +2752,11 @@ def run_worldcup_simulation(
         group: str = "",
         match_date_override: date | None = None,
     ) -> tuple[dict[str, Any], str]:
-        match_date = match_date_override or match_dates[stage]
+        match_date = match_date_override or (
+            date(2026, 7, 15)
+            if stage == "SEMI_FINALS" and match_id == 102
+            else match_dates[stage]
+        )
         if simulator.engine == "lightgbm" and simulator.lightgbm_model is not None:
             prediction = simulator.lightgbm_prediction(team_a, team_b, match_date, stage)
             expected_a = float(prediction["team_a_goals"])
