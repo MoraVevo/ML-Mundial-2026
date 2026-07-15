@@ -10,11 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from kinela.fifa_ranking import (
+    fifa_sum_match_importance,
     fifa_ranking_for_match_date,
     load_fifa_ranking,
     load_fifa_ranking_history,
     normalise_team_name,
-    update_live_fifa_points,
+    update_fifa_sum_points,
 )
 
 CORE_DETAIL_STAT_FEATURES = [
@@ -80,6 +81,10 @@ DETAIL_STAT_FEATURES = [
 ]
 MIN_TRAINING_DATE = date(2023, 1, 1)
 BASE_ELO = 1500.0
+ELO_K_FACTOR = 24.0
+ELO_EXPECTATION_SCALE = 400.0
+ELO_GOAL_MARGIN_WEIGHT = 0.15
+ELO_FRIENDLY_WEIGHT = 1.0
 H2H_LOOKBACK_DAYS = 730
 RECENT_FORM_WINDOW = 6
 ENABLE_SQUAD_CONTINUITY_WEIGHT = False
@@ -866,37 +871,134 @@ def _load_statsbomb_score_timing_metrics(
     return by_match
 
 
+def _manual_goal_events_from_notes(
+    notes: str,
+    home_team: str,
+    away_team: str,
+    home_goals: int,
+    away_goals: int,
+) -> list[dict[str, Any]]:
+    if home_goals + away_goals == 0:
+        return []
+
+    def resolve_team(raw: str) -> str | None:
+        raw_key = normalise_team_name(raw)
+        home_key = normalise_team_name(home_team)
+        away_key = normalise_team_name(away_team)
+        raw_text = raw.strip().casefold()
+        home_text = home_team.strip().casefold()
+        away_text = away_team.strip().casefold()
+        if raw_text == home_text:
+            return home_team
+        if raw_text == away_text:
+            return away_team
+        if raw_key == home_key:
+            return home_team
+        if raw_key == away_key:
+            return away_team
+        if home_key and home_key in raw_key:
+            return home_team
+        if away_key and away_key in raw_key:
+            return away_team
+        return None
+
+    def minutes_from(text: str) -> list[tuple[int, int | None]]:
+        values: list[tuple[int, int | None]] = []
+        for match in re.finditer(r"(\d{1,3})(?:\+(\d{1,2}))?'", text):
+            values.append((int(match.group(1)), int(match.group(2) or 0) or None))
+        return values
+
+    events: list[dict[str, Any]] = []
+    seen: set[tuple[str, int, int]] = set()
+
+    def add_events(team: str | None, values: list[tuple[int, int | None]]) -> None:
+        if team is None:
+            return
+        for minute, extra in values:
+            key = (normalise_team_name(team), minute, extra or 0)
+            if key in seen:
+                continue
+            seen.add(key)
+            events.append(
+                {
+                    "type": "Goal",
+                    "time": {"elapsed": minute, "extra": extra},
+                    "team": {"name": team},
+                }
+            )
+
+    text = re.split(
+        r"\b(?:Yellow cards?|Red cards?|No red cards?|No red card)\b",
+        notes or "",
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    text = re.sub(r"^Final:[^.]*\.\s*", "", text).strip()
+    if not text:
+        return []
+
+    for clause in re.split(r";|\.(?:\s|$)", text):
+        clause = clause.strip()
+        if not clause or "'" not in clause:
+            continue
+        clause_lower = clause.casefold()
+        if "ruled out" in clause_lower or "offside" in clause_lower or "disallowed" in clause_lower:
+            continue
+        team: str | None = None
+        team_match = re.search(
+            r"\bfor\s+([^.;]+?)(?=[.;]|$|\s+(?:and|with|after|before)\b)",
+            clause,
+            flags=re.IGNORECASE,
+        )
+        if team_match:
+            team = resolve_team(team_match.group(1).strip())
+        if team is None:
+            clause_key = normalise_team_name(clause)
+            clause_text = clause.strip().casefold()
+            for candidate in (home_team, away_team):
+                candidate_key = normalise_team_name(candidate)
+                candidate_text = candidate.strip().casefold()
+                if (
+                    clause_key.startswith(candidate_key)
+                    or f"{candidate_key} goals" in clause_key
+                    or clause_text.startswith(candidate_text)
+                    or f"{candidate_text} goals" in clause_text
+                ):
+                    team = candidate
+                    break
+        add_events(team, minutes_from(clause))
+
+    if _valid_goal_events(events, home_team, away_team, home_goals, away_goals) is not None:
+        return events
+
+    all_minutes = minutes_from(text)
+    if home_goals > 0 and away_goals == 0 and len(all_minutes) == home_goals:
+        events = []
+        seen = set()
+        add_events(home_team, all_minutes)
+    elif away_goals > 0 and home_goals == 0 and len(all_minutes) == away_goals:
+        events = []
+        seen = set()
+        add_events(away_team, all_minutes)
+    return events
+
+
 def _load_manual_late85_points_swing_metrics(data_root: Path) -> dict[str, dict[str, dict[str, float]]]:
     path = data_root / "static" / "worldcup_2026_manual_results.csv"
     if not path.exists():
         return {}
     by_match: dict[str, dict[str, dict[str, float]]] = {}
-    minute_pattern = re.compile(r"(\d{1,3})(?:\+(\d{1,2}))?'(?:[^.;]*?)for ([^.;]+)")
     with path.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             home = row["team_a"]
             away = row["team_b"]
-            allowed = {normalise_team_name(home): home, normalise_team_name(away): away}
-            events = []
-            for match in minute_pattern.finditer(row.get("notes") or ""):
-                minute = int(match.group(1))
-                extra = int(match.group(2) or 0) or None
-                raw_team = match.group(3).strip()
-                raw_team = re.split(r"\s+(?:and|No red|Yellow|Red)\b", raw_team)[0].strip()
-                team = allowed.get(normalise_team_name(raw_team))
-                if team is None:
-                    if normalise_team_name(home) in normalise_team_name(raw_team):
-                        team = home
-                    elif normalise_team_name(away) in normalise_team_name(raw_team):
-                        team = away
-                if team:
-                    events.append(
-                        {
-                            "type": "Goal",
-                            "time": {"elapsed": minute, "extra": extra},
-                            "team": {"name": team},
-                        }
-                    )
+            events = _manual_goal_events_from_notes(
+                row.get("notes") or "",
+                home,
+                away,
+                int(row["team_a_goals"]),
+                int(row["team_b_goals"]),
+            )
             events = _valid_goal_events(
                 events,
                 home,
@@ -915,32 +1017,17 @@ def _load_manual_score_timing_metrics(data_root: Path) -> dict[str, dict[str, di
     if not path.exists():
         return {}
     by_match: dict[str, dict[str, dict[str, float]]] = {}
-    minute_pattern = re.compile(r"(\d{1,3})(?:\+(\d{1,2}))?'(?:[^.;]*?)for ([^.;]+)")
     with path.open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle):
             home = row["team_a"]
             away = row["team_b"]
-            allowed = {normalise_team_name(home): home, normalise_team_name(away): away}
-            events = []
-            for match in minute_pattern.finditer(row.get("notes") or ""):
-                minute = int(match.group(1))
-                extra = int(match.group(2) or 0) or None
-                raw_team = match.group(3).strip()
-                raw_team = re.split(r"\s+(?:and|No red|Yellow|Red)\b", raw_team)[0].strip()
-                team = allowed.get(normalise_team_name(raw_team))
-                if team is None:
-                    if normalise_team_name(home) in normalise_team_name(raw_team):
-                        team = home
-                    elif normalise_team_name(away) in normalise_team_name(raw_team):
-                        team = away
-                if team:
-                    events.append(
-                        {
-                            "type": "Goal",
-                            "time": {"elapsed": minute, "extra": extra},
-                            "team": {"name": team},
-                        }
-                    )
+            events = _manual_goal_events_from_notes(
+                row.get("notes") or "",
+                home,
+                away,
+                int(row["team_a_goals"]),
+                int(row["team_b_goals"]),
+            )
             events = _valid_goal_events(
                 events,
                 home,
@@ -1964,6 +2051,8 @@ def _with_recent_features(
         for side, opp in (("home", "away"), ("away", "home")):
             team_key = _team_history_key(row, side)
             opponent_key = _team_history_key(row, opp)
+            elo_team_key = normalise_team_name(row[f"{side}_team"])
+            elo_opponent_key = normalise_team_name(row[f"{opp}_team"])
             history = list(histories[team_key])
             # Keep the historical recent6 column names for model compatibility;
             # the actual rolling window is controlled by RECENT_FORM_WINDOW.
@@ -2006,8 +2095,11 @@ def _with_recent_features(
             current[f"{side}_rest_days"] = (
                 (match_date - last_played[team_key]).days if team_key in last_played else None
             )
-            current[f"{side}_elo_pre"] = elo_ratings[team_key]
-            current[f"{side}_opponent_elo_pre"] = elo_ratings[opponent_key]
+            # Elo must identify a national team consistently across providers.
+            # Source-specific spellings such as USA/United States and
+            # Türkiye/Turkey otherwise fragment a single team's rating history.
+            current[f"{side}_elo_pre"] = elo_ratings[elo_team_key]
+            current[f"{side}_opponent_elo_pre"] = elo_ratings[elo_opponent_key]
             wc_history = list(worldcup_histories[team_key])
             for index in range(6):
                 outcome = wc_history[-(index + 1)]["outcome"] if index < len(wc_history) else None
@@ -2079,16 +2171,27 @@ def _with_recent_features(
                         detail_item
                     )
             last_played[team_key] = match_date
-        home_key = _team_history_key(row, "home")
-        away_key = _team_history_key(row, "away")
+        home_key = normalise_team_name(row["home_team"])
+        away_key = normalise_team_name(row["away_team"])
         home_goals = int(row["home_goals"])
         away_goals = int(row["away_goals"])
         home_elo = elo_ratings[home_key]
         away_elo = elo_ratings[away_key]
-        expected_home = 1 / (1 + 10 ** ((away_elo - home_elo) / 400))
+        expected_home = 1 / (
+            1 + 10 ** ((away_elo - home_elo) / ELO_EXPECTATION_SCALE)
+        )
         actual_home = 1.0 if home_goals > away_goals else 0.5 if home_goals == away_goals else 0.0
         goal_margin = min(abs(home_goals - away_goals), 3)
-        k_factor = 24 * (1 + 0.15 * goal_margin)
+        competition_weight = (
+            ELO_FRIENDLY_WEIGHT
+            if row.get("competition_type") == "friendly"
+            else 1.0
+        )
+        k_factor = (
+            ELO_K_FACTOR
+            * competition_weight
+            * (1 + ELO_GOAL_MARGIN_WEIGHT * goal_margin)
+        )
         change = k_factor * (actual_home - expected_home)
         elo_ratings[home_key] = home_elo + change
         elo_ratings[away_key] = away_elo - change
@@ -2379,6 +2482,16 @@ def export_training_frame(
     phase_stats: dict[str, dict[str, float]] = {}
     fifa_rankings = load_fifa_ranking(data_root)
     fifa_ranking_history = load_fifa_ranking_history(data_root)
+    manual_extra_time_winners: dict[str, str] = {}
+    manual_results_path = data_root / "static" / "worldcup_2026_manual_results.csv"
+    if manual_results_path.exists():
+        with manual_results_path.open(encoding="utf-8") as handle:
+            for manual in csv.DictReader(handle):
+                extra_time_winner = (manual.get("extra_time_winner") or "").strip()
+                if extra_time_winner:
+                    manual_extra_time_winners[
+                        str(manual.get("match_id") or "").split(":")[-1]
+                    ] = extra_time_winner
     fallback_fifa_rank = max((int(item["rank"]) for item in fifa_rankings.values()), default=211) + 25
     fallback_fifa_points = min(
         (float(item["points"]) for item in fifa_rankings.values()),
@@ -2429,6 +2542,34 @@ def export_training_frame(
             live_fifa_points[key] = float(official["points"])
             live_fifa_schedule[key] = schedule_id
         return live_fifa_points[key]
+
+    def fifa_sum_results(row: dict[str, Any]) -> tuple[float, float]:
+        home_penalties = _optional_int(row.get("home_penalty_goals"))
+        away_penalties = _optional_int(row.get("away_penalty_goals"))
+        if home_penalties is not None and away_penalties is not None:
+            return (
+                (0.75, 0.5)
+                if home_penalties > away_penalties
+                else (0.5, 0.75)
+            )
+        match_key = str(row.get("match_id") or "").split(":")[-1]
+        extra_time_winner = manual_extra_time_winners.get(match_key, "")
+        if extra_time_winner:
+            return (
+                (1.0, 0.0)
+                if normalise_team_name(extra_time_winner)
+                == normalise_team_name(row["home_team"])
+                else (0.0, 1.0)
+            )
+        home_goals = int(row["home_goals"])
+        away_goals = int(row["away_goals"])
+        return (
+            (1.0, 0.0)
+            if home_goals > away_goals
+            else (0.0, 1.0)
+            if away_goals > home_goals
+            else (0.5, 0.5)
+        )
 
     for row in train:
         competition = competition_stats.setdefault(_competition_key(row), _empty_stats())
@@ -2795,15 +2936,20 @@ def export_training_frame(
         exported.append(export_row)
         home_key = normalise_team_name(row["home_team"])
         away_key = normalise_team_name(row["away_team"])
-        updated_home_points, updated_away_points = update_live_fifa_points(
+        home_fifa_result, away_fifa_result = fifa_sum_results(row)
+        updated_home_points, updated_away_points = update_fifa_sum_points(
             home_live_fifa_points,
             away_live_fifa_points,
-            int(row["home_goals"]),
-            int(row["away_goals"]),
-            importance_weight=(
-                live_fifa_friendly_weight
-                if row.get("competition_type") == "friendly"
-                else 1.0
+            team_a_result=home_fifa_result,
+            team_b_result=away_fifa_result,
+            importance=fifa_sum_match_importance(
+                str(row.get("competition_name") or ""),
+                str(row.get("competition_type") or ""),
+                str(row.get("stage_or_round") or ""),
+            ),
+            protect_negative=(
+                row.get("competition_type") == "major_tournament"
+                and _is_knockout(str(row.get("stage_or_round") or ""))
             ),
         )
         live_fifa_points[home_key] = updated_home_points

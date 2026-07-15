@@ -320,16 +320,24 @@ PARSIMONIOUS_NEUTRAL_FEATURES = [
     "quality_form_edge",
     "goal_balance_edge",
     "draw_pressure_index",
-    "quality_score_control_swing_edge",
-    "rating_guardrail_edge",
-    "match_script_compatibility_edge",
-    "clinical_low_block_matchup_edge",
+    "score_timing_edge",
     "club_star_finisher_edge",
-    "worldcup_points_memory_edge",
     "worldcup_fotmob_current_story_edge",
 ]
-NEUTRAL_MODEL_RECIPE = "neutral_worldcup_v3_fotmob_current_story"
-NEUTRAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
+NEUTRAL_GOAL_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
+NEUTRAL_BASE_RESULT_FEATURES = PARSIMONIOUS_NEUTRAL_FEATURES
+NEUTRAL_XG_RESULT_FEATURES = [
+    "worldcup_fotmob_xg_matchup_team_a",
+    "worldcup_fotmob_xg_matchup_team_b",
+]
+NEUTRAL_RESULT_FEATURES = [*NEUTRAL_BASE_RESULT_FEATURES, *NEUTRAL_XG_RESULT_FEATURES]
+NEUTRAL_XG_RESULT_BLEND_WEIGHT = 0.50
+NEUTRAL_MODEL_RECIPE = (
+    "neutral_worldcup_v10_fifa_sum_live_no_custom_elo_depth4_fotmob_xg_probability_ensemble"
+)
+# Legacy callers use this list for the two goal regressors. The result
+# classifier receives the separate, small xG feature list above.
+NEUTRAL_FEATURES = NEUTRAL_GOAL_FEATURES
 NEUTRAL_CANDIDATE_FEATURES = [
     "late85_points_swing_edge",
     "score_state_value_edge",
@@ -377,6 +385,7 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "club_attack_talent_edge",
     "club_star_finisher_edge",
     "club_talent_coverage_pair",
+    "worldcup_points_memory_edge",
     "worldcup_chance_quality_edge",
     "worldcup_detail_flow_edge",
     "worldcup_fotmob_xg_balance_edge",
@@ -391,10 +400,20 @@ NEUTRAL_CANDIDATE_FEATURES = [
     "worldcup_fotmob_current_low_block_solution_edge",
     "worldcup_fotmob_current_transition_punch_edge",
     "worldcup_fotmob_current_unrewarded_pressure_edge",
+    "worldcup_fotmob_current_controlled_dominance_edge",
     "worldcup_fotmob_current_story_edge",
+    "worldcup_fotmob_xg_matchup_team_a",
+    "worldcup_fotmob_xg_matchup_team_b",
 ]
 NEUTRAL_EXPORT_FEATURES = list(
-    dict.fromkeys([*NEUTRAL_BASE_FEATURES, *NEUTRAL_FEATURES, *NEUTRAL_CANDIDATE_FEATURES])
+    dict.fromkeys(
+        [
+            *NEUTRAL_BASE_FEATURES,
+            *NEUTRAL_GOAL_FEATURES,
+            *NEUTRAL_RESULT_FEATURES,
+            *NEUTRAL_CANDIDATE_FEATURES,
+        ]
+    )
 )
 NEUTRAL_EXPORT_COLUMNS = [
     "split",
@@ -415,6 +434,19 @@ def _num_series(frame: pd.DataFrame, column: str) -> pd.Series:
 def _safe_ratio(numerator: pd.Series, denominator: pd.Series, fallback: float = 0.0) -> pd.Series:
     denominator = denominator.replace(0, np.nan)
     return (numerator / denominator).replace([np.inf, -np.inf], np.nan).fillna(fallback)
+
+
+def blend_result_probabilities(
+    base_probabilities: np.ndarray,
+    xg_probabilities: np.ndarray,
+    *,
+    weight: float = NEUTRAL_XG_RESULT_BLEND_WEIGHT,
+) -> np.ndarray:
+    """Blend calibrated base and xG-aware result probabilities."""
+    blend_weight = float(np.clip(weight, 0.0, 1.0))
+    return (1.0 - blend_weight) * np.asarray(base_probabilities) + blend_weight * np.asarray(
+        xg_probabilities
+    )
 
 
 def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
@@ -504,15 +536,18 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
     ) + 0.50 * (
         _num_series(out, "recent6_goals_for_diff") - _num_series(out, "recent6_goals_against_diff")
     )
-    # Keep plain recent points as an exported diagnostic. The direct active
-    # form signal remains opponent-adjusted because clean, deduplicated World
-    # Cup validation shows that it generalizes better across cumulative
-    # windows. It also supplies the contextual form term used for draw parity.
+    # Plain recent points are the active form signal and also supply the
+    # contextual form term used for draw parity. The legacy opponent-adjusted
+    # value stays exported only for ablation diagnostics.
     out["recent_points_form_edge"] = _num_series(out, "recent6_points_diff")
-    out["quality_form_edge"] = _num_series(
+    out["opponent_adjusted_quality_form_edge"] = _num_series(
         out,
         "recent6_quality_result_points_diff",
     )
+    # Production uses an interpretable, provider-independent recent-points
+    # signal.  The opponent-adjusted version depends on the project's custom
+    # Elo and remains diagnostic only.
+    out["quality_form_edge"] = out["recent_points_form_edge"]
     out["historical_rating_threat_edge"] = 0.52 * out[
         "historical_rating_consensus_edge"
     ] + 0.48 * np.tanh(out["threat_edge"] / 1.25)
@@ -520,11 +555,13 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
         out["historical_fifa_anchor_edge"]
         - out["historical_rating_threat_edge"]
     )
-    # Model-facing rating features must use only rankings available before the
-    # match. For future simulations the historical inputs fall back to the
-    # current ranking, so training and inference retain the same definition.
-    out["rating_threat_edge"] = out["historical_rating_threat_edge"]
-    out["rating_guardrail_edge"] = out["historical_rating_guardrail_edge"]
+    # Keep one model-facing strength signal: FIFA SUM live points available
+    # immediately before the match. Rank is determined by those same points,
+    # and the project's separate Elo would duplicate another Elo-style update.
+    out["rating_threat_edge"] = historical_fifa_pair_observed * np.tanh(
+        live_fifa_points_diff / 190.0
+    )
+    out["rating_guardrail_edge"] = 0.0
     out["rating_drift_edge"] = out["live_fifa_anchor_edge"] - out[
         "historical_fifa_anchor_edge"
     ]
@@ -552,7 +589,7 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
         0.55 * fouls_volume + 0.30 * cards_volume + 0.15 * physical_imbalance
     )
     control_quality_edge = (
-        0.40 * out["historical_rating_consensus_edge"]
+        0.40 * out["rating_threat_edge"]
         + 0.30 * np.tanh(out["threat_edge"] / 1.25)
         + 0.20 * np.tanh(out["quality_form_edge"] / 1.8)
         + 0.10 * np.tanh(out["goal_balance_edge"] / 1.5)
@@ -1198,6 +1235,15 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
         history_prefix: str = "worldcup",
     ) -> dict[str, pd.Series]:
         column_prefix = f"team_{prefix}_{history_prefix}_recent6"
+        xg = _num_series(out, f"{column_prefix}_fotmob_expected_goals")
+        xgc = _num_series(out, f"{column_prefix}_fotmob_expected_goals_conceded")
+        xgot = _num_series(out, f"{column_prefix}_fotmob_expected_goals_on_target")
+        big = _num_series(out, f"{column_prefix}_fotmob_big_chances")
+        big_conceded = _num_series(out, f"{column_prefix}_fotmob_big_chances_conceded")
+        big_missed = _num_series(out, f"{column_prefix}_fotmob_big_chances_missed")
+        shots = _num_series(out, f"{column_prefix}_fotmob_total_shots")
+        shots_on_target = _num_series(out, f"{column_prefix}_fotmob_shots_on_target")
+        touches_box = _num_series(out, f"{column_prefix}_fotmob_touches_opp_box")
         underlying = _num_series(out, f"{column_prefix}_fotmob_underlying_threat")
         finishing = _num_series(out, f"{column_prefix}_fotmob_finishing_signal")
         waste = _num_series(out, f"{column_prefix}_fotmob_waste_signal")
@@ -1225,11 +1271,40 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
             out,
             f"{column_prefix}_fotmob_clinical_chance_signal",
         )
-        xg_balance = _num_series(
-            out,
-            f"{column_prefix}_fotmob_expected_goals",
-        ) - _num_series(out, f"{column_prefix}_fotmob_expected_goals_conceded")
+        xg_balance = xg - xgc
+        shot_pressure = (
+            0.34 * np.tanh(xg / 1.65)
+            + 0.18 * np.tanh(xgot / 1.40)
+            + 0.16 * np.tanh(big / 2.80)
+            + 0.13 * np.tanh(shots / 14.0)
+            + 0.11 * np.tanh(shots_on_target / 4.8)
+            + 0.08 * np.tanh(touches_box / 24.0)
+        )
+        concession_control = (
+            0.58 * (1.0 - np.tanh(xgc / 1.55))
+            + 0.27 * (1.0 - np.tanh(big_conceded / 2.60))
+            + 0.15 * np.tanh(xg_balance / 1.65)
+        )
+        controlled_dominance = (
+            0.30 * chance_control
+            + 0.24 * shot_pressure
+            + 0.20 * concession_control
+            + 0.12 * underlying
+            + 0.08 * clinical
+            - 0.09 * waste
+            - 0.05 * sterile_control
+            - 0.03 * np.tanh(big_missed / 2.70)
+        ).clip(lower=-1.0, upper=1.0)
         return {
+            "xg": xg,
+            "xgc": xgc,
+            "xgot": xgot,
+            "big": big,
+            "big_conceded": big_conceded,
+            "big_missed": big_missed,
+            "shots": shots,
+            "shots_on_target": shots_on_target,
+            "touches_box": touches_box,
             "underlying": underlying,
             "finishing": finishing,
             "waste": waste,
@@ -1240,6 +1315,7 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
             "unrewarded": unrewarded,
             "clinical": clinical,
             "xg_balance": xg_balance,
+            "controlled_dominance": controlled_dominance,
         }
 
     a_wc_fotmob = side_worldcup_fotmob("a")
@@ -1314,6 +1390,29 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
     ).min(axis=1)
     a_current_wc = side_worldcup_fotmob("a", "current_worldcup")
     b_current_wc = side_worldcup_fotmob("b", "current_worldcup")
+    historical_xg_matchup_a = 0.50 * (a_wc_fotmob["xg"] + b_wc_fotmob["xgc"])
+    historical_xg_matchup_b = 0.50 * (b_wc_fotmob["xg"] + a_wc_fotmob["xgc"])
+    current_xg_matchup_a = 0.50 * (a_current_wc["xg"] + b_current_wc["xgc"])
+    current_xg_matchup_b = 0.50 * (b_current_wc["xg"] + a_current_wc["xgc"])
+    xg_matchup_coverage = 0.55 * wc_fotmob_pair_coverage + 0.45 * current_wc_pair_coverage
+    xg_matchup_denominator = xg_matchup_coverage.replace(0.0, np.nan)
+    # Each side's xG is opponent-aware: what it creates plus what the rival
+    # concedes. The wider World Cup history provides a stable baseline and the
+    # current tournament supplies a controlled live update.
+    out["worldcup_fotmob_xg_matchup_team_a"] = (
+        (
+            0.55 * wc_fotmob_pair_coverage * historical_xg_matchup_a
+            + 0.45 * current_wc_pair_coverage * current_xg_matchup_a
+        )
+        / xg_matchup_denominator
+    ).fillna(0.0)
+    out["worldcup_fotmob_xg_matchup_team_b"] = (
+        (
+            0.55 * wc_fotmob_pair_coverage * historical_xg_matchup_b
+            + 0.45 * current_wc_pair_coverage * current_xg_matchup_b
+        )
+        / xg_matchup_denominator
+    ).fillna(0.0)
     current_low_block_pair_coverage = pd.concat(
         [
             current_wc_pair_coverage,
@@ -1348,9 +1447,23 @@ def add_neutral_treated_features(frame: pd.DataFrame) -> pd.DataFrame:
     out["worldcup_fotmob_current_unrewarded_pressure_edge"] = current_wc_pair_coverage * (
         a_current_wc["unrewarded"] - b_current_wc["unrewarded"]
     ).clip(lower=-1.0, upper=1.0)
-    out["worldcup_fotmob_current_story_edge"] = out[
-        "worldcup_fotmob_current_low_block_solution_edge"
-    ].clip(lower=-1.0, upper=1.0)
+    out["worldcup_fotmob_current_controlled_dominance_edge"] = current_wc_pair_coverage * (
+        a_current_wc["controlled_dominance"] - b_current_wc["controlled_dominance"]
+    ).clip(lower=-1.0, upper=1.0)
+    current_worldcup_story = (
+        0.52 * out["worldcup_fotmob_current_controlled_dominance_edge"]
+        + 0.20 * out["worldcup_fotmob_current_chance_pressure_edge"]
+        + 0.18 * out["worldcup_fotmob_current_low_block_solution_edge"]
+        + 0.07 * out["worldcup_fotmob_current_transition_punch_edge"]
+        + 0.03 * out["worldcup_fotmob_current_unrewarded_pressure_edge"]
+    ).clip(lower=-1.0, upper=1.0)
+    # The current tournament is most useful when interpreted through a wider
+    # World Cup tactical baseline. This keeps the live story responsive while
+    # supplying enough historical coverage for the conservative tree to learn.
+    out["worldcup_fotmob_current_story_edge"] = (
+        0.55 * out["worldcup_fotmob_interpreted_edge"]
+        + 0.45 * current_worldcup_story
+    ).clip(lower=-1.0, upper=1.0)
     out["club_star_finisher_edge"] = _num_series(
         out,
         "team_a_club_star_finisher_signal",
@@ -2674,19 +2787,34 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
     neutral_frame = _build_neutral_frame(frame, augment=True)
     train = neutral_frame[neutral_frame["split"] == "train"].copy()
     test = neutral_frame[neutral_frame["split"] == "test"].copy()
-    x_train = train[NEUTRAL_FEATURES]
-    x_test = test[NEUTRAL_FEATURES]
-    categorical = CATEGORICAL_FEATURES
+    goal_features = list(NEUTRAL_GOAL_FEATURES)
+    base_result_features = list(NEUTRAL_BASE_RESULT_FEATURES)
+    result_features = list(NEUTRAL_RESULT_FEATURES)
+    x_train = train[goal_features]
+    x_test = test[goal_features]
+    base_result_x_train = train[base_result_features]
+    base_result_x_test = test[base_result_features]
+    result_x_train = train[result_features]
+    result_x_test = test[result_features]
+    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in goal_features]
+    base_result_categorical = [
+        feature for feature in CATEGORICAL_FEATURES if feature in base_result_features
+    ]
+    result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in result_features]
     train_weights = train["match_recency_weight"].astype(float).to_numpy()
 
     reg_params = {
         "objective": "regression",
         "n_estimators": 350,
         "learning_rate": 0.035,
-        "num_leaves": 23,
-        "min_child_samples": 35,
-        "subsample": 0.85,
-        "colsample_bytree": 0.85,
+        "num_leaves": 12,
+        "max_depth": 4,
+        "min_child_samples": 60,
+        "subsample": 0.82,
+        "colsample_bytree": 0.82,
+        "reg_alpha": 0.10,
+        "reg_lambda": 1.0,
+        "min_split_gain": 0.005,
         "random_state": 42,
         "verbosity": -1,
     }
@@ -2711,21 +2839,53 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
         objective="multiclass",
         n_estimators=300,
         learning_rate=0.035,
-        num_leaves=23,
-        min_child_samples=35,
-        subsample=0.85,
-        colsample_bytree=0.85,
+        num_leaves=12,
+        max_depth=4,
+        min_child_samples=60,
+        subsample=0.82,
+        colsample_bytree=0.82,
+        reg_alpha=0.10,
+        reg_lambda=1.0,
+        min_split_gain=0.005,
         random_state=42,
         verbosity=-1,
     )
     calibrated = CalibratedClassifierCV(clf, method="sigmoid", cv=3)
     calibrated.fit(
-        x_train,
+        base_result_x_train,
         train["result_label"],
         sample_weight=train_weights,
-        categorical_feature=categorical,
+        categorical_feature=base_result_categorical,
     )
-    probabilities = calibrated.predict_proba(x_test)
+    xg_classifier = CalibratedClassifierCV(
+        lgb.LGBMClassifier(
+            objective="multiclass",
+            n_estimators=300,
+            learning_rate=0.035,
+            num_leaves=12,
+            max_depth=4,
+            min_child_samples=60,
+            subsample=0.82,
+            colsample_bytree=0.82,
+            reg_alpha=0.10,
+            reg_lambda=1.0,
+            min_split_gain=0.005,
+            random_state=42,
+            verbosity=-1,
+        ),
+        method="sigmoid",
+        cv=3,
+    )
+    xg_classifier.fit(
+        result_x_train,
+        train["result_label"],
+        sample_weight=train_weights,
+        categorical_feature=result_categorical,
+    )
+    probabilities = blend_result_probabilities(
+        calibrated.predict_proba(base_result_x_test),
+        xg_classifier.predict_proba(result_x_test),
+    )
     predicted_labels = probabilities.argmax(axis=1)
     actual_labels = test["result_label"].to_numpy()
 
@@ -2735,7 +2895,10 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
         "matches": int(len(frame)),
         "train_rows_after_augmentation": int(len(train)),
         "test_matches": int(len(test)),
-        "features": len(NEUTRAL_FEATURES),
+        "features": len(goal_features),
+        "goal_features": len(goal_features),
+        "result_features": len(result_features),
+        "xg_result_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
         "base_features_available": len(NEUTRAL_BASE_FEATURES),
         "recency_weight_min": round(float(train_weights.min()), 4),
         "recency_weight_max": round(float(train_weights.max()), 4),
@@ -2752,7 +2915,13 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
             "team_a_goals_model": team_a_model,
             "team_b_goals_model": team_b_model,
             "result_model": calibrated,
-            "features": NEUTRAL_FEATURES,
+            "xg_result_model": xg_classifier,
+            "features": goal_features,
+            "team_a_goal_features": goal_features,
+        "team_b_goal_features": goal_features,
+        "result_features": base_result_features,
+            "xg_result_features": result_features,
+            "result_probability_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
             "model_id": NEUTRAL_MODEL_RECIPE,
             "sklearn_version": sklearn.__version__,
             "lightgbm_version": lgb.__version__,
@@ -2761,12 +2930,14 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
     )
     payload = {
         "metrics": metrics,
-        "features_list": NEUTRAL_FEATURES,
+        "features_list": goal_features,
+        "goal_features": goal_features,
+        "result_features": result_features,
         "team_a_goal_importances": sorted(
             [
                 {"feature": feature, "importance": float(importance)}
                 for feature, importance in zip(
-                    NEUTRAL_FEATURES, team_a_model.feature_importances_, strict=True
+                    goal_features, team_a_model.feature_importances_, strict=True
                 )
             ],
             key=lambda item: item["importance"],
@@ -2776,7 +2947,7 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
             [
                 {"feature": feature, "importance": float(importance)}
                 for feature, importance in zip(
-                    NEUTRAL_FEATURES, team_b_model.feature_importances_, strict=True
+                    goal_features, team_b_model.feature_importances_, strict=True
                 )
             ],
             key=lambda item: item["importance"],
@@ -2784,7 +2955,11 @@ def train_lightgbm_neutral(data_root: Path, frame: pd.DataFrame | None = None) -
         ),
         "result_classifier_importances": _calibrated_classifier_importances(
             calibrated,
-            NEUTRAL_FEATURES,
+            goal_features,
+        ),
+        "xg_result_classifier_importances": _calibrated_classifier_importances(
+            xg_classifier,
+            result_features,
         ),
     }
     (output_dir / "lightgbm_neutral_metrics.json").write_text(

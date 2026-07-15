@@ -1,8 +1,33 @@
 # Evaluacion del modelo
 
-Este reporte evalua el modelo neutral con cortes temporales disenados para que los partidos de test no entren al entrenamiento.
+Este reporte conserva los cortes temporales historicos y documenta tambien el
+artefacto activo de produccion. Los partidos de test nunca entran al
+entrenamiento.
 
-Identificador del modelo: `neutral_worldcup_v1`
+## Estado de produccion (v10, actualizado al 2026-07-11)
+
+Identificador holdout: `neutral_worldcup_v10_fifa_sum_live_no_custom_elo_depth4_fotmob_xg_probability_ensemble_worldcup_2026_holdout`.
+
+El holdout del Mundial tiene 100 partidos, 67 aciertos (67.00%), log-loss
+0.8688 y MAE medio de goles 0.8975. El artefacto `all_played` usa 887 partidos
+completados, incluidos los 100 partidos del Mundial ya jugados hasta el
+2026-07-11, para predecir los cruces restantes.
+
+La receta activa tiene 9 features para los regresores de goles y 11 para el
+clasificador de resultado: las dos features adicionales son el xG de matchup,
+mezclado 50/50 con el clasificador base. FIFA SUM Live es la unica señal activa
+de fuerza; el Elo interno queda como diagnóstico y no se suma a la receta.
+
+La fase eliminatoria se modela en dos capas posteriores al resultado de 90
+minutos. Un empate pasa por un Poisson de prorroga entrenado con eventos
+StatsBomb de periodos 3/4 (29 partidos, 18 goles; lambda 0.621). Si sigue
+empatado, se usa el artefacto de penales 50/50. Los goles de prorroga se
+guardan separados y no contaminan historial ni features de 90 minutos.
+
+Las tablas inferiores son el reporte historico v9 que genero los graficos
+versionados; no deben interpretarse como metricas actuales de v10.
+
+Identificador historico: `neutral_worldcup_v9_conservative_depth4_fotmob_xg_probability_ensemble`
 
 ## Politicas de test
 
@@ -11,8 +36,8 @@ Identificador del modelo: `neutral_worldcup_v1`
 Los partidos jugados del Mundial 2026 se fuerzan como test. El entrenamiento usa solo partidos de selecciones anteriores al primer partido del Mundial 2026; esos partidos de test no se usan para entrenar.
 
 - Partidos de entrenamiento: 787
-- Partidos de test: 75
-- Ventana de test: 2026-06-11 a 2026-06-29
+- Partidos de test: 97
+- Ventana de test: 2026-06-11 a 2026-07-09
 
 ### Test externo temporal
 
@@ -27,16 +52,16 @@ Test aleatorio de 104 partidos nacionales no amistosos y fuera del Mundial 2026,
 Diagnostico combinado del objetivo: todos los partidos jugados del Mundial 2026 mas el test externo temporal de partidos oficiales no amistosos. El entrenamiento usa solo partidos anteriores a la primera fecha seleccionada de test y ningun partido de test entra al entrenamiento.
 
 - Partidos de entrenamiento: 565
-- Partidos de test: 179
-- Ventana de test: 2024-09-07 a 2026-06-29
+- Partidos de test: 201
+- Ventana de test: 2024-09-07 a 2026-07-09
 
 ## Metricas
 
 | Evaluacion | Accuracy | Correctos | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Test Mundial 2026 | 0.6000 | 45/75 | 0.9333 | 1.0843 | 0.8574 | 0.9708 |
-| Test externo temporal | 0.6731 | 70/104 | 0.9064 | 0.9963 | 1.0625 | 1.0294 |
-| Test combinado objetivo | 0.6369 | 114/179 | 0.9409 | 1.0417 | 0.9659 | 1.0038 |
+| Test Mundial 2026 | 0.6495 | 63/97 | 0.8490 | 0.9559 | 0.8765 | 0.9162 |
+| Test externo temporal | 0.6538 | 68/104 | 0.8728 | 0.9992 | 0.9856 | 0.9924 |
+| Test combinado objetivo | 0.6368 | 128/201 | 0.8969 | 0.9834 | 0.9428 | 0.9631 |
 
 ![Resumen de metricas](assets/model_evaluation/metrics_summary.png)
 
@@ -48,9 +73,9 @@ La metrica principal sigue siendo el test Mundial 2026. El test combinado se inc
 
 | Evaluacion | Empates reales | Empates predichos como clase principal |
 |---|---:|---:|
-| Test Mundial 2026 | 21 | 2 |
+| Test Mundial 2026 | 24 | 1 |
 | Test externo temporal | 22 | 0 |
-| Test combinado objetivo | 43 | 0 |
+| Test combinado objetivo | 46 | 0 |
 
 Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo esta asignando probabilidad util a empates y partidos cerrados. El MAE se reporta aparte porque los regresores de goles pueden estar razonablemente calibrados aunque el clasificador 1X2 elija otra clase.
 
@@ -76,14 +101,14 @@ Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo 
 
 | Feature | Importancia |
 |---|---:|
-| `draw_pressure_index` | 2494.33 |
-| `rating_guardrail_edge` | 2273.33 |
-| `score_control_value_edge` | 2242.33 |
-| `quality_form_edge` | 2217.67 |
-| `clinical_low_block_matchup_edge` | 2159.67 |
-| `match_script_compatibility_edge` | 2104.00 |
-| `rating_threat_edge` | 2042.00 |
-| `goal_balance_edge` | 1720.00 |
+| `rating_guardrail_edge` | 1008.00 |
+| `draw_pressure_index` | 886.33 |
+| `rating_threat_edge` | 764.00 |
+| `quality_form_edge` | 711.67 |
+| `score_timing_edge` | 696.00 |
+| `goal_balance_edge` | 541.00 |
+| `stage_or_round` | 374.67 |
+| `worldcup_fotmob_xg_matchup_team_a` | 186.00 |
 
 ### Test externo temporal
 
@@ -91,14 +116,14 @@ Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo 
 
 | Feature | Importancia |
 |---|---:|
-| `draw_pressure_index` | 2096.33 |
-| `rating_guardrail_edge` | 1724.67 |
-| `score_control_value_edge` | 1639.67 |
-| `match_script_compatibility_edge` | 1567.00 |
-| `quality_form_edge` | 1540.00 |
-| `rating_threat_edge` | 1524.33 |
-| `clinical_low_block_matchup_edge` | 1422.33 |
-| `goal_balance_edge` | 1386.67 |
+| `draw_pressure_index` | 956.67 |
+| `rating_guardrail_edge` | 855.00 |
+| `rating_threat_edge` | 759.00 |
+| `score_timing_edge` | 708.67 |
+| `quality_form_edge` | 607.67 |
+| `goal_balance_edge` | 507.67 |
+| `stage_or_round` | 353.67 |
+| `worldcup_fotmob_xg_matchup_team_a` | 150.67 |
 
 ### Test combinado objetivo
 
@@ -106,14 +131,14 @@ Por eso se muestra log loss junto a accuracy: accuracy sola oculta si el modelo 
 
 | Feature | Importancia |
 |---|---:|
-| `draw_pressure_index` | 2096.33 |
-| `rating_guardrail_edge` | 1724.67 |
-| `score_control_value_edge` | 1639.67 |
-| `match_script_compatibility_edge` | 1567.00 |
-| `quality_form_edge` | 1540.00 |
-| `rating_threat_edge` | 1524.33 |
-| `clinical_low_block_matchup_edge` | 1422.33 |
-| `goal_balance_edge` | 1386.67 |
+| `draw_pressure_index` | 956.67 |
+| `rating_guardrail_edge` | 855.00 |
+| `rating_threat_edge` | 759.00 |
+| `score_timing_edge` | 708.67 |
+| `quality_form_edge` | 607.67 |
+| `goal_balance_edge` | 507.67 |
+| `stage_or_round` | 353.67 |
+| `worldcup_fotmob_xg_matchup_team_a` | 150.67 |
 
 ## Analisis de error
 
@@ -125,22 +150,24 @@ Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| FIFA World Cup | 75 | 0.6000 | 0.9333 | 1.0843 | 0.8574 | 0.9708 |
+| FIFA World Cup | 97 | 0.6495 | 0.8490 | 0.9559 | 0.8765 | 0.9162 |
 
 #### Por fase/ronda
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| GROUP_STAGE | 72 | 0.5972 | 0.9355 | 1.1056 | 0.8566 | 0.9811 |
-| ROUND_OF_32 | 3 | 0.6667 | 0.8817 | 0.5738 | 0.8760 | 0.7249 |
+| LAST_16 | 8 | 0.6250 | 0.8679 | 0.9083 | 1.5732 | 1.2407 |
+| GROUP_STAGE | 72 | 0.6250 | 0.8722 | 1.0606 | 0.8385 | 0.9495 |
+| ROUND_OF_32 | 16 | 0.7500 | 0.7380 | 0.5594 | 0.6953 | 0.6273 |
+| QUARTER_FINALS | 1 | 1.0000 | n/a | 0.1481 | 0.9388 | 0.5435 |
 
 #### Por resultado real
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Empate | 21 | 0.0476 | n/a | 1.4040 | 0.9387 | 1.1713 |
-| Equipo A | 35 | 0.7429 | n/a | 1.0694 | 0.7194 | 0.8944 |
-| Equipo B | 19 | 0.9474 | n/a | 0.7585 | 1.0216 | 0.8900 |
+| Empate | 24 | 0.0000 | n/a | 1.0816 | 0.8989 | 0.9902 |
+| Equipo B | 26 | 0.8846 | n/a | 0.6688 | 1.1788 | 0.9238 |
+| Equipo A | 47 | 0.8511 | n/a | 1.0507 | 0.6978 | 0.8742 |
 
 ### Test externo temporal
 
@@ -148,33 +175,33 @@ Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| World Cup - Qualification Europe | 40 | 0.8250 | 0.7735 | 1.1626 | 1.0715 | 1.1171 |
-| World Cup - Qualification Africa | 19 | 0.7895 | 0.8164 | 0.9604 | 1.2479 | 1.1042 |
-| African Nations Championship - Qualification | 2 | 0.5000 | n/a | 0.7462 | 1.1670 | 0.9566 |
-| UEFA Nations League | 29 | 0.4828 | 1.0758 | 0.9556 | 0.9574 | 0.9565 |
-| Gulf Cup of Nations | 5 | 0.2000 | 1.2245 | 0.9904 | 0.8217 | 0.9060 |
-| CONCACAF Nations League | 9 | 0.6667 | 0.9310 | 0.5224 | 1.0799 | 0.8012 |
+| World Cup - Qualification Europe | 40 | 0.8250 | 0.7364 | 1.2008 | 1.0210 | 1.1109 |
+| World Cup - Qualification Africa | 19 | 0.7895 | 0.7639 | 0.8237 | 1.0824 | 0.9531 |
+| UEFA Nations League | 29 | 0.4138 | 1.0409 | 0.9333 | 0.9200 | 0.9266 |
+| African Nations Championship - Qualification | 2 | 0.5000 | n/a | 0.8352 | 0.9899 | 0.9126 |
+| CONCACAF Nations League | 9 | 0.6667 | 0.9661 | 0.8081 | 0.9256 | 0.8668 |
+| Gulf Cup of Nations | 5 | 0.2000 | 1.1266 | 0.8448 | 0.8214 | 0.8331 |
 
 #### Por fase/ronda
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| League A - 1 | 1 | 1.0000 | n/a | 2.8990 | 1.5576 | 2.2283 |
-| League A - 5 | 2 | 1.0000 | 0.8101 | 2.6005 | 0.8481 | 1.7243 |
-| League B - 6 | 1 | 1.0000 | n/a | 2.3639 | 0.7067 | 1.5353 |
-| League A - 2 | 2 | 0.5000 | 1.0366 | 0.3974 | 2.0240 | 1.2107 |
-| Play-offs A/B | 3 | 0.0000 | 1.4712 | 1.4791 | 0.7527 | 1.1159 |
-| GROUP_STAGE | 61 | 0.7869 | 0.8088 | 1.0714 | 1.1402 | 1.1058 |
-| QUARTER_FINALS | 9 | 0.4444 | 1.0628 | 0.8664 | 1.1416 | 1.0040 |
-| 2nd Round | 2 | 0.5000 | n/a | 0.7462 | 1.1670 | 0.9566 |
+| League A - 1 | 1 | 1.0000 | n/a | 3.4009 | 1.4907 | 2.4458 |
+| League B - 6 | 1 | 1.0000 | n/a | 2.3374 | 0.7041 | 1.5208 |
+| League A - 5 | 2 | 1.0000 | 0.5476 | 2.2599 | 0.4991 | 1.3795 |
+| League A - 2 | 2 | 0.5000 | 1.0145 | 0.6649 | 1.4573 | 1.0611 |
+| GROUP_STAGE | 61 | 0.7869 | 0.7628 | 1.0283 | 1.0493 | 1.0388 |
+| THIRD_PLACE | 1 | 1.0000 | n/a | 1.1938 | 0.8739 | 1.0338 |
+| SEMI_FINALS | 4 | 0.5000 | 0.9459 | 1.5878 | 0.4462 | 1.0170 |
+| Play-offs A/B | 3 | 0.0000 | 1.2925 | 1.2916 | 0.6215 | 0.9565 |
 
 #### Por resultado real
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Equipo A | 45 | 0.8222 | n/a | 1.3173 | 0.7992 | 1.0582 |
-| Empate | 22 | 0.0000 | n/a | 0.7165 | 1.3065 | 1.0115 |
-| Equipo B | 37 | 0.8919 | n/a | 0.7721 | 1.2377 | 1.0049 |
+| Equipo A | 45 | 0.7778 | n/a | 1.2521 | 0.7835 | 1.0178 |
+| Equipo B | 37 | 0.8919 | n/a | 0.8418 | 1.1397 | 0.9907 |
+| Empate | 22 | 0.0000 | n/a | 0.7466 | 1.1399 | 0.9432 |
 
 ### Test combinado objetivo
 
@@ -182,38 +209,40 @@ Las siguientes tablas ordenan los grupos por mayor MAE promedio de goles. Sirven
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| World Cup - Qualification Europe | 40 | 0.8250 | 0.7735 | 1.1626 | 1.0715 | 1.1171 |
-| World Cup - Qualification Africa | 19 | 0.7895 | 0.8164 | 0.9604 | 1.2479 | 1.1042 |
-| FIFA World Cup | 75 | 0.5867 | 0.9888 | 1.1047 | 0.8319 | 0.9683 |
-| African Nations Championship - Qualification | 2 | 0.5000 | n/a | 0.7462 | 1.1670 | 0.9566 |
-| UEFA Nations League | 29 | 0.4828 | 1.0758 | 0.9556 | 0.9574 | 0.9565 |
-| Gulf Cup of Nations | 5 | 0.2000 | 1.2245 | 0.9904 | 0.8217 | 0.9060 |
-| CONCACAF Nations League | 9 | 0.6667 | 0.9310 | 0.5224 | 1.0799 | 0.8012 |
+| World Cup - Qualification Europe | 40 | 0.8250 | 0.7364 | 1.2008 | 1.0210 | 1.1109 |
+| World Cup - Qualification Africa | 19 | 0.7895 | 0.7639 | 0.8237 | 1.0824 | 0.9531 |
+| FIFA World Cup | 97 | 0.6186 | 0.9227 | 0.9664 | 0.8969 | 0.9317 |
+| UEFA Nations League | 29 | 0.4138 | 1.0409 | 0.9333 | 0.9200 | 0.9266 |
+| African Nations Championship - Qualification | 2 | 0.5000 | n/a | 0.8352 | 0.9899 | 0.9126 |
+| CONCACAF Nations League | 9 | 0.6667 | 0.9661 | 0.8081 | 0.9256 | 0.8668 |
+| Gulf Cup of Nations | 5 | 0.2000 | 1.1266 | 0.8448 | 0.8214 | 0.8331 |
 
 #### Por fase/ronda
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| League A - 1 | 1 | 1.0000 | n/a | 2.8990 | 1.5576 | 2.2283 |
-| League A - 5 | 2 | 1.0000 | 0.8101 | 2.6005 | 0.8481 | 1.7243 |
-| League B - 6 | 1 | 1.0000 | n/a | 2.3639 | 0.7067 | 1.5353 |
-| League A - 2 | 2 | 0.5000 | 1.0366 | 0.3974 | 2.0240 | 1.2107 |
-| Play-offs A/B | 3 | 0.0000 | 1.4712 | 1.4791 | 0.7527 | 1.1159 |
-| GROUP_STAGE | 133 | 0.6767 | 0.9063 | 1.0959 | 0.9802 | 1.0380 |
-| QUARTER_FINALS | 9 | 0.4444 | 1.0628 | 0.8664 | 1.1416 | 1.0040 |
-| 2nd Round | 2 | 0.5000 | n/a | 0.7462 | 1.1670 | 0.9566 |
+| League A - 1 | 1 | 1.0000 | n/a | 3.4009 | 1.4907 | 2.4458 |
+| League B - 6 | 1 | 1.0000 | n/a | 2.3374 | 0.7041 | 1.5208 |
+| League A - 5 | 2 | 1.0000 | 0.5476 | 2.2599 | 0.4991 | 1.3795 |
+| LAST_16 | 8 | 0.6250 | 0.9117 | 0.8699 | 1.6060 | 1.2380 |
+| League A - 2 | 2 | 0.5000 | 1.0145 | 0.6649 | 1.4573 | 1.0611 |
+| THIRD_PLACE | 1 | 1.0000 | n/a | 1.1938 | 0.8739 | 1.0338 |
+| SEMI_FINALS | 4 | 0.5000 | 0.9459 | 1.5878 | 0.4462 | 1.0170 |
+| GROUP_STAGE | 133 | 0.6767 | 0.8631 | 1.0542 | 0.9432 | 0.9987 |
 
 #### Por resultado real
 
 | Grupo | Partidos | Accuracy | Log loss | MAE equipo A | MAE equipo B | MAE prom. |
 |---|---:|---:|---:|---:|---:|---:|
-| Equipo A | 80 | 0.7875 | n/a | 1.3299 | 0.7531 | 1.0415 |
-| Empate | 43 | 0.0000 | n/a | 0.8829 | 1.0715 | 0.9772 |
-| Equipo B | 56 | 0.9107 | n/a | 0.7519 | 1.1887 | 0.9703 |
+| Equipo A | 92 | 0.7935 | n/a | 1.1950 | 0.7489 | 0.9720 |
+| Equipo B | 63 | 0.8730 | n/a | 0.7618 | 1.1764 | 0.9691 |
+| Empate | 46 | 0.0000 | n/a | 0.8635 | 1.0107 | 0.9371 |
 
 ## Construccion de features
 
-El modelo activo usa 12 features prepartido:
+El reporte historico v9 usaba 10 features prepartido en su base y 12 en el
+clasificador xG paralelo (mezcla de probabilidades 50%/50%). La receta activa
+v10 esta descrita arriba y redujo la base a 9 features y el clasificador a 11.
 
 | Feature | Significado |
 |---|---|
@@ -223,19 +252,20 @@ El modelo activo usa 12 features prepartido:
 | `quality_form_edge` | Forma reciente ajustada por calidad del rival, no solo puntos crudos. |
 | `goal_balance_edge` | Diferencia de balance goleador reciente e historico: goles a favor menos goles recibidos. |
 | `draw_pressure_index` | Indice de paridad y baja separacion esperada; ayuda a calibrar partidos cerrados. |
-| `score_control_value_edge` | Ventaja en control de marcador: capacidad reciente de sostener o transformar estados de partido. |
+| `score_timing_edge` | Ventaja validada de score timing: cuanto controlo el marcador, que tan temprano golpeo, si rescato o perdio puntos tarde, y cuanto tiempo paso persiguiendo el partido. |
 | `rating_guardrail_edge` | Correccion de seguridad cuando las senales de amenaza se alejan demasiado del rating base. |
-| `match_script_compatibility_edge` | Compatibilidad tactica estimada entre estilos de partido de ambos equipos. |
-| `clinical_low_block_matchup_edge` | Cruce entre definicion ofensiva y capacidad/riesgo contra bloques bajos. |
 | `club_star_finisher_edge` | Ventaja del mejor finalizador reciente de club dentro del nucleo usado por la seleccion; prioriza techo goleador sobre promedio de talento. |
-| `worldcup_points_memory_edge` | Memoria ponderada de puntos en los ultimos partidos mundialistas disponibles antes del partido. |
+| `worldcup_fotmob_current_story_edge` | Lectura conservadora del Mundial actual: dominio controlado, presion de ocasiones, soluciones ante bloque bajo, transicion y presion no premiada, siempre con cobertura bilateral. |
+| `worldcup_fotmob_xg_matchup_team_a` | xG esperado para el Equipo A: mitad de su xG creado y mitad del xG que concede el rival, con mezcla de historial mundialista y torneo actual. |
+| `worldcup_fotmob_xg_matchup_team_b` | xG esperado para el Equipo B con la misma construccion neutral y prepartido. |
 
 Grupos conceptuales:
 
 - Fuerza/rating: ranking FIFA, fuerza tipo Elo y guardrails de ranking.
 - Forma reciente: puntos ajustados por rival y balance de goles.
 - Contexto del partido: tipo de competicion, fase/ronda y presion de empate.
-- Perfil tactico/ofensivo: compatibilidad de guion de partido y matchup contra bloque bajo.
+- Perfil ofensivo del Mundial actual: score timing, control de ocasiones, dominio controlado y finalizador diferencial.
+- xG de matchup: xG que cada equipo crea combinado con xG que el rival concede; solo entra al clasificador xG paralelo, no a los regresores de goles.
 
 Quedan fuera de los features: goles objetivo, resultado final, ids crudos, fecha cruda, equipos, fuente y estadisticas postpartido del encuentro evaluado.
 

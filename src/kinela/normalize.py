@@ -401,6 +401,40 @@ def normalize_fotmob_world_cups(data_root: Path) -> dict[str, int]:
                 json.loads(match_path.read_text(encoding="utf-8"))
             ) or {}
             stats = _fotmob_stat_lookup(content)
+            shots = _fotmob_shots(content.get("shotmap"))
+            is_after_extra_time = str(
+                fixture.get("status", {}).get("reason", {}).get("short") or ""
+            ).upper() in {"AET", "PEN"} or any(
+                "Extra" in str(shot.get("period") or "") for shot in shots
+            )
+            regulation_shots = [
+                shot
+                for shot in shots
+                if str(shot.get("period") or "") in {"FirstHalf", "SecondHalf"}
+            ]
+            if is_after_extra_time:
+                home_score = sum(
+                    1
+                    for shot in regulation_shots
+                    if shot.get("eventType") == "Goal"
+                    and (
+                        str(shot.get("teamId")) == str(home.get("id"))
+                        and not shot.get("isOwnGoal")
+                        or str(shot.get("teamId")) == str(away.get("id"))
+                        and shot.get("isOwnGoal")
+                    )
+                )
+                away_score = sum(
+                    1
+                    for shot in regulation_shots
+                    if shot.get("eventType") == "Goal"
+                    and (
+                        str(shot.get("teamId")) == str(away.get("id"))
+                        and not shot.get("isOwnGoal")
+                        or str(shot.get("teamId")) == str(home.get("id"))
+                        and shot.get("isOwnGoal")
+                    )
+                )
             match_rows.append(
                 {
                     "season": season,
@@ -421,6 +455,25 @@ def normalize_fotmob_world_cups(data_root: Path) -> dict[str, int]:
             )
             teams = [(0, "home", home), (1, "away", away)]
             for index, side, team in teams:
+                team_regulation_shots = [
+                    shot
+                    for shot in regulation_shots
+                    if str(shot.get("teamId")) == str(team.get("id"))
+                    and not shot.get("isOwnGoal")
+                ]
+                regulation_xg = sum(
+                    float(shot.get("expectedGoals") or 0.0) for shot in team_regulation_shots
+                )
+                regulation_xgot = sum(
+                    float(shot.get("expectedGoalsOnTarget") or 0.0)
+                    for shot in team_regulation_shots
+                )
+                regulation_on_target = sum(
+                    1
+                    for shot in team_regulation_shots
+                    if shot.get("eventType") in {"Goal", "AttemptSaved"}
+                    and not shot.get("isBlocked")
+                )
                 team_rows.append(
                     {
                         "season": season,
@@ -432,33 +485,37 @@ def normalize_fotmob_world_cups(data_root: Path) -> dict[str, int]:
                         "opponent": away.get("name") if side == "home" else home.get("name"),
                         "goals_for": home_score if side == "home" else away_score,
                         "goals_against": away_score if side == "home" else home_score,
-                        "expected_goals": _fotmob_side_value(stats, "expected_goals", index),
-                        "expected_goals_non_penalty": _fotmob_side_value(
-                            stats,
-                            "expected_goals_non_penalty",
-                            index,
+                        "expected_goals": (
+                            regulation_xg
+                            if is_after_extra_time
+                            else _fotmob_side_value(stats, "expected_goals", index)
                         ),
-                        "expected_goals_on_target": _fotmob_side_value(
-                            stats,
-                            "expected_goals_on_target",
-                            index,
+                        "expected_goals_non_penalty": (
+                            sum(
+                                float(shot.get("expectedGoals") or 0.0)
+                                for shot in team_regulation_shots
+                                if str(shot.get("situation") or "").lower() != "penalty"
+                            )
+                            if is_after_extra_time
+                            else _fotmob_side_value(stats, "expected_goals_non_penalty", index)
                         ),
-                        "big_chances": _fotmob_side_value(stats, "big_chance", index),
-                        "big_chances_missed": _fotmob_side_value(
-                            stats,
-                            "big_chance_missed_title",
-                            index,
+                        "expected_goals_on_target": (
+                            regulation_xgot
+                            if is_after_extra_time
+                            else _fotmob_side_value(stats, "expected_goals_on_target", index)
                         ),
-                        "total_shots": _fotmob_side_value(stats, "total_shots", index),
-                        "shots_on_target": _fotmob_side_value(stats, "ShotsOnTarget", index),
-                        "shots_inside_box": _fotmob_side_value(stats, "shots_inside_box", index),
-                        "shots_outside_box": _fotmob_side_value(stats, "shots_outside_box", index),
-                        "touches_opp_box": _fotmob_side_value(stats, "touches_opp_box", index),
-                        "corners": _fotmob_side_value(stats, "corners", index),
-                        "possession_pct": _fotmob_side_value(stats, "BallPossesion", index),
+                        "big_chances": None if is_after_extra_time else _fotmob_side_value(stats, "big_chance", index),
+                        "big_chances_missed": None if is_after_extra_time else _fotmob_side_value(stats, "big_chance_missed_title", index),
+                        "total_shots": len(team_regulation_shots) if is_after_extra_time else _fotmob_side_value(stats, "total_shots", index),
+                        "shots_on_target": regulation_on_target if is_after_extra_time else _fotmob_side_value(stats, "ShotsOnTarget", index),
+                        "shots_inside_box": sum(bool(shot.get("isFromInsideBox")) for shot in team_regulation_shots) if is_after_extra_time else _fotmob_side_value(stats, "shots_inside_box", index),
+                        "shots_outside_box": sum(not bool(shot.get("isFromInsideBox")) for shot in team_regulation_shots) if is_after_extra_time else _fotmob_side_value(stats, "shots_outside_box", index),
+                        "touches_opp_box": None if is_after_extra_time else _fotmob_side_value(stats, "touches_opp_box", index),
+                        "corners": None if is_after_extra_time else _fotmob_side_value(stats, "corners", index),
+                        "possession_pct": None if is_after_extra_time else _fotmob_side_value(stats, "BallPossesion", index),
                     }
                 )
-            for shot in _fotmob_shots(content.get("shotmap")):
+            for shot in shots:
                 shot_rows.append(
                     {
                         "season": season,
@@ -480,6 +537,8 @@ def normalize_fotmob_world_cups(data_root: Path) -> dict[str, int]:
                         "is_blocked": shot.get("isBlocked"),
                         "is_own_goal": shot.get("isOwnGoal"),
                         "is_from_inside_box": shot.get("isFromInsideBox"),
+                        "is_regulation_time": str(shot.get("period") or "")
+                        in {"FirstHalf", "SecondHalf"},
                     }
                 )
 
@@ -554,6 +613,7 @@ def normalize_fotmob_world_cups(data_root: Path) -> dict[str, int]:
                 "is_blocked",
                 "is_own_goal",
                 "is_from_inside_box",
+                "is_regulation_time",
             ],
         ),
     }

@@ -34,14 +34,25 @@ from kinela.club_attacking_talent import (
     club_talent_summary_before,
 )
 from kinela.fifa_ranking import (
+    fifa_sum_match_importance,
     load_fifa_ranking,
     normalise_team_name,
-    update_live_fifa_points,
+    update_fifa_sum_points,
 )
-from kinela.lightgbm_model import CATEGORICAL_FEATURES, NEUTRAL_FEATURES, add_neutral_treated_features
+from kinela.lightgbm_model import (
+    CATEGORICAL_FEATURES,
+    NEUTRAL_FEATURES,
+    add_neutral_treated_features,
+    blend_result_probabilities,
+)
 from kinela.model import (
     BASE_ELO,
     DETAIL_STAT_FEATURES,
+    ELO_EXPECTATION_SCALE,
+    ELO_FRIENDLY_WEIGHT,
+    ELO_GOAL_MARGIN_WEIGHT,
+    ELO_K_FACTOR,
+    FOTMOB_WORLD_CUP_DETAIL_FEATURES,
     H2H_LOOKBACK_DAYS,
     RECENT_FORM_WINDOW,
     _cross_confederation_adjusted_points,
@@ -52,6 +63,8 @@ from kinela.model import (
     load_late85_points_swing_metrics,
     load_score_timing_metrics,
 )
+from kinela.penalty_model import PenaltyShootoutPredictor
+from kinela.extra_time_model import ExtraTimePredictor
 
 
 @dataclass(frozen=True)
@@ -68,46 +81,47 @@ class TeamStanding:
 
 
 class PenaltyShootoutModel:
-    """Fallback shootout model, ready to be replaced by a trained model."""
+    """Portable, neutral shootout model selected by temporal backtesting."""
 
     def __init__(self, simulator: WorldCup2026Simulator) -> None:
         self.simulator = simulator
-
-    def _team_penalty_net(self, team: str, before: date) -> float:
-        team_key = _normalise_name(team)
-        recent: list[dict[str, float]] = []
-        for row in self.simulator.penalty_shootouts:
-            if row["date"] >= before:
-                continue
-            if row["home_key"] == team_key:
-                recent.append(
-                    {
-                        "scored": row["home_penalty_goals"],
-                        "conceded": row["away_penalty_goals"],
-                    }
-                )
-            elif row["away_key"] == team_key:
-                recent.append(
-                    {
-                        "scored": row["away_penalty_goals"],
-                        "conceded": row["home_penalty_goals"],
-                    }
-                )
-        recent = recent[-3:]
-        scored = 0.0
-        conceded = 0.0
-        for row in recent:
-            scored += row["scored"]
-            conceded += row["conceded"]
-        return (scored - conceded) / max(1.0, scored + conceded)
+        artifact_path = simulator.data_root / "static" / "penalty_shootout_model.json"
+        self.predictor: PenaltyShootoutPredictor | None = None
+        if artifact_path.exists():
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+            self.predictor = PenaltyShootoutPredictor(artifact)
 
     def team_a_probability(self, team_a: str, team_b: str, match_date: date) -> float:
-        squad_diff = (
-            self.simulator._squad_quality_score(team_a) - self.simulator._squad_quality_score(team_b)
-        ) / 5
-        score = 0.10 * squad_diff
-        probability = 1 / (1 + math.exp(-score))
-        return max(0.38, min(0.62, probability))
+        if self.predictor is None:
+            return 0.5
+        return self.predictor.probability(team_a, team_b, match_date)
+
+
+class ExtraTimeModel:
+    """Extra-time-only scoring layer; regulation inputs and outputs stay separate."""
+
+    def __init__(self, simulator: WorldCup2026Simulator) -> None:
+        artifact_path = simulator.data_root / "static" / "extra_time_model.json"
+        if artifact_path.exists():
+            artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
+        else:
+            artifact = {"total_goal_lambda": 0.62, "allocation_exponent": 0.0}
+        self.predictor = ExtraTimePredictor(artifact)
+
+    def expected_goals(self, xg_90_a: float, xg_90_b: float) -> tuple[float, float]:
+        return self.predictor.expected_goals(xg_90_a, xg_90_b)
+
+    def team_a_advance_probability(
+        self,
+        penalty_probability_a: float,
+        xg_90_a: float,
+        xg_90_b: float,
+    ) -> float:
+        return self.predictor.team_a_advance_probability(
+            penalty_probability_a,
+            xg_90_a,
+            xg_90_b,
+        )
 
 
 R32_SLOTS = [
@@ -232,10 +246,12 @@ class WorldCup2026Simulator:
         self.engine = engine
         self.lightgbm_model = self._load_lightgbm_model() if engine == "lightgbm" else None
         self.penalty_model = PenaltyShootoutModel(self)
+        self.extra_time_model = ExtraTimeModel(self)
         self.simulated_histories: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.current_match_records: list[dict[str, Any]] = []
         self.prediction_cache: dict[tuple[str, str, str, str], dict[str, Any]] = {}
         self.history = self._load_history()
+        self.manual_results = self._load_manual_results()
         self.late85_points_swing_metrics = load_late85_points_swing_metrics(
             self.data_root,
             self.history,
@@ -263,13 +279,18 @@ class WorldCup2026Simulator:
             (float(item["points"]) for item in self.fifa_rankings.values()),
             default=800.0,
         )
-        self.fifa_point_overrides = self._build_fifa_point_overrides()
+        self.tournament_start_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=False,
+        )
+        self.base_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=True,
+        )
+        self.fifa_point_overrides = dict(self.base_fifa_point_overrides)
         self.squad_quality = self._load_squad_quality()
         self.squad_players = self._load_squad_players()
         self.player_availability = self._load_player_availability()
         self.third_place_assignment_table = self._load_third_place_assignment_table()
         self.fixtures = self._load_fixtures()
-        self.manual_results = self._load_manual_results()
         self.group_matches = [match for match in self.fixtures if match["stage"] == "GROUP_STAGE"]
         self.groups = self._build_groups()
         contexts = self._goal_contexts()
@@ -295,6 +316,33 @@ class WorldCup2026Simulator:
                 _warn_if_model_runtime_mismatch(model, path)
                 return model
         return None
+
+    def _refresh_derived_state(self) -> None:
+        self.simulated_histories = defaultdict(list)
+        self.current_match_records = []
+        self.prediction_cache.clear()
+        self.team_histories = self._index_team_histories()
+        self.head_to_head_histories = self._index_head_to_head_histories()
+        self.worldcup_histories = self._index_worldcup_histories()
+        self.elo_ratings = self._build_elo_ratings()
+        self.confederation_stats, self.team_cross_confederation_stats = (
+            self._build_confederation_contexts()
+        )
+        self.tournament_start_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=False,
+        )
+        self.base_fifa_point_overrides = self._build_fifa_point_overrides(
+            include_manual_worldcup=True,
+        )
+        self.fifa_point_overrides = dict(self.base_fifa_point_overrides)
+        contexts = self._goal_contexts()
+        self.global_goal_avg = contexts["global_avg"]
+        self.major_goal_avg = contexts["major_avg"]
+        self.group_goal_avg = contexts["group_avg"]
+        self.knockout_goal_avg = contexts["knockout_avg"]
+        self.major_match_count = contexts["major_matches"]
+        self.group_match_count = contexts["group_matches"]
+        self.knockout_match_count = contexts["knockout_matches"]
 
     def _load_third_place_assignment_table(self) -> dict[str, dict[int, str]]:
         path = self.data_root / "static" / "worldcup_2026_third_place_assignments.csv"
@@ -428,6 +476,8 @@ class WorldCup2026Simulator:
             indexed[home].append(
                 {
                     "date": row["date_obj"],
+                    "source": row.get("source", ""),
+                    "competition_name": row.get("competition_name", ""),
                     "gf": row["home_goals"],
                     "ga": row["away_goals"],
                     "points": _points(row["home_goals"], row["away_goals"]),
@@ -464,7 +514,8 @@ class WorldCup2026Simulator:
                     "detail_stats": {
                         feature: (
                             _float(row.get(f"home_actual_{feature}"))
-                            if _float(row.get(f"home_actual_{feature}")) is not None
+                            if feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+                            or _float(row.get(f"home_actual_{feature}")) is not None
                             else _float(row.get(f"home_recent6_{feature}_avg"))
                         )
                         for feature in DETAIL_STAT_FEATURES
@@ -474,6 +525,8 @@ class WorldCup2026Simulator:
             indexed[away].append(
                 {
                     "date": row["date_obj"],
+                    "source": row.get("source", ""),
+                    "competition_name": row.get("competition_name", ""),
                     "gf": row["away_goals"],
                     "ga": row["home_goals"],
                     "points": _points(row["away_goals"], row["home_goals"]),
@@ -510,7 +563,8 @@ class WorldCup2026Simulator:
                     "detail_stats": {
                         feature: (
                             _float(row.get(f"away_actual_{feature}"))
-                            if _float(row.get(f"away_actual_{feature}")) is not None
+                            if feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES
+                            or _float(row.get(f"away_actual_{feature}")) is not None
                             else _float(row.get(f"away_recent6_{feature}_avg"))
                         )
                         for feature in DETAIL_STAT_FEATURES
@@ -545,7 +599,9 @@ class WorldCup2026Simulator:
             away = _normalise_name(row["away_team"])
             home_elo = ratings[home]
             away_elo = ratings[away]
-            expected_home = 1 / (1 + 10 ** ((away_elo - home_elo) / 400))
+            expected_home = 1 / (
+                1 + 10 ** ((away_elo - home_elo) / ELO_EXPECTATION_SCALE)
+            )
             actual_home = (
                 1.0
                 if row["home_goals"] > row["away_goals"]
@@ -554,7 +610,16 @@ class WorldCup2026Simulator:
                 else 0.0
             )
             goal_margin = min(abs(row["home_goals"] - row["away_goals"]), 3)
-            k_factor = 24 * (1 + 0.15 * goal_margin)
+            competition_weight = (
+                ELO_FRIENDLY_WEIGHT
+                if row.get("competition_type") == "friendly"
+                else 1.0
+            )
+            k_factor = (
+                ELO_K_FACTOR
+                * competition_weight
+                * (1 + ELO_GOAL_MARGIN_WEIGHT * goal_margin)
+            )
             change = k_factor * (actual_home - expected_home)
             ratings[home] = home_elo + change
             ratings[away] = away_elo - change
@@ -969,6 +1034,29 @@ class WorldCup2026Simulator:
             ]
             detail_stats[feature] = _mean(values, 0.0)
             detail_coverage_values.append(1.0 if values else 0.0)
+
+        def fotmob_worldcup_detail_stats(matches: list[dict[str, Any]]) -> dict[str, float]:
+            stats: dict[str, float] = {}
+            for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+                values = [
+                    item["detail_stats"][feature]
+                    for item in matches
+                    if item.get("detail_stats", {}).get(feature) is not None
+                ]
+                stats[feature] = _mean(values, 0.0)
+            return stats
+
+        worldcup_recent = [
+            item
+            for item in history
+            if item.get("competition_name") == "FIFA World Cup"
+            and item.get("detail_stats", {}).get("fotmob_detail_coverage") is not None
+        ][-RECENT_FORM_WINDOW:]
+        current_worldcup_recent = [
+            item
+            for item in worldcup_recent
+            if item["date"].year == match_date.year
+        ][-RECENT_FORM_WINDOW:]
         score_metric_names = [
             "score_state_value",
             "score_control_value",
@@ -1108,6 +1196,10 @@ class WorldCup2026Simulator:
             "worldcup_recent6_win_rate": self._worldcup_recent6_win_rate(team, match_date),
             "rest_days": (match_date - history[-1]["date"]).days if history else None,
             "detail_stats": detail_stats,
+            "worldcup_detail_stats": fotmob_worldcup_detail_stats(worldcup_recent),
+            "current_worldcup_detail_stats": fotmob_worldcup_detail_stats(
+                current_worldcup_recent,
+            ),
             "detail_coverage": _mean(detail_coverage_values, 0.0),
         }
 
@@ -1137,11 +1229,18 @@ class WorldCup2026Simulator:
     def _elo(self, team: str) -> float:
         return self.elo_ratings.get(_normalise_name(team), BASE_ELO)
 
-    def _build_fifa_point_overrides(self) -> dict[str, float]:
+    def _build_fifa_point_overrides(
+        self,
+        *,
+        include_manual_worldcup: bool = True,
+    ) -> dict[str, float]:
         points: dict[str, float] = {
             key: float(value.get("points", self.fallback_fifa_points))
             for key, value in self.fifa_rankings.items()
         }
+        if not include_manual_worldcup:
+            return points
+        manual_results = getattr(self, "manual_results", {})
         for row in self.history:
             if row.get("source") != "manual-worldcup-2026":
                 continue
@@ -1149,13 +1248,60 @@ class WorldCup2026Simulator:
             away = normalise_team_name(row["away_team"])
             home_points = points.get(home, self.fallback_fifa_points)
             away_points = points.get(away, self.fallback_fifa_points)
-            points[home], points[away] = update_live_fifa_points(
-                home_points,
-                away_points,
+            manual = manual_results.get(
+                str(row.get("match_id") or "").split(":")[-1],
+                {},
+            )
+            home_result, away_result = self._fifa_sum_results(
+                row["home_team"],
+                row["away_team"],
                 int(row["home_goals"]),
                 int(row["away_goals"]),
+                penalty_winner=str(manual.get("penalty_winner") or ""),
+                extra_time_winner=str(manual.get("extra_time_winner") or ""),
+            )
+            stage = str(row.get("stage_or_round") or "")
+            points[home], points[away] = update_fifa_sum_points(
+                home_points,
+                away_points,
+                team_a_result=home_result,
+                team_b_result=away_result,
+                importance=fifa_sum_match_importance(
+                    "FIFA World Cup",
+                    "major_tournament",
+                    stage,
+                ),
+                protect_negative=stage.upper() != "GROUP_STAGE",
             )
         return points
+
+    @staticmethod
+    def _fifa_sum_results(
+        team_a: str,
+        team_b: str,
+        team_a_goals: int,
+        team_b_goals: int,
+        *,
+        penalty_winner: str = "",
+        extra_time_winner: str = "",
+    ) -> tuple[float, float]:
+        if penalty_winner in {team_a, team_b}:
+            return (0.75, 0.5) if penalty_winner == team_a else (0.5, 0.75)
+        if extra_time_winner in {team_a, team_b}:
+            return (1.0, 0.0) if extra_time_winner == team_a else (0.0, 1.0)
+        return (
+            (1.0, 0.0)
+            if team_a_goals > team_b_goals
+            else (0.0, 1.0)
+            if team_b_goals > team_a_goals
+            else (0.5, 0.5)
+        )
+
+    def _reset_tournament_state(self) -> None:
+        self.simulated_histories = defaultdict(list)
+        self.current_match_records = []
+        self.fifa_point_overrides = dict(self.tournament_start_fifa_point_overrides)
+        self.prediction_cache.clear()
 
     def _worldcup_last6_flags(self, team: str, before: date) -> dict[str, int]:
         matches = self.worldcup_histories.get(_normalise_name(team), [])
@@ -1307,6 +1453,8 @@ class WorldCup2026Simulator:
         stage: str,
         group_table: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        # Keep recent-form features anchored to real completed matches; simulated
+        # results only update live FIFA overrides and explicit group context.
         a = self._team_features(team_a, match_date, include_simulated=False)
         b = self._team_features(team_b, match_date, include_simulated=False)
         fifa_a = self._fifa_ranking_features(team_a)
@@ -1586,6 +1734,15 @@ class WorldCup2026Simulator:
             row[f"recent6_{feature}_diff"] = (
                 a["detail_stats"][feature] - b["detail_stats"][feature]
             )
+        for feature in FOTMOB_WORLD_CUP_DETAIL_FEATURES:
+            row[f"team_a_worldcup_recent6_{feature}"] = a["worldcup_detail_stats"][feature]
+            row[f"team_b_worldcup_recent6_{feature}"] = b["worldcup_detail_stats"][feature]
+            row[f"team_a_current_worldcup_recent6_{feature}"] = a[
+                "current_worldcup_detail_stats"
+            ][feature]
+            row[f"team_b_current_worldcup_recent6_{feature}"] = b[
+                "current_worldcup_detail_stats"
+            ][feature]
         row["team_a_tactical_detail_coverage"] = a["detail_coverage"]
         row["team_b_tactical_detail_coverage"] = b["detail_coverage"]
         return row
@@ -1593,13 +1750,24 @@ class WorldCup2026Simulator:
     def _cache_key(self, team_a: str, team_b: str, match_date: date, stage: str) -> tuple[str, str, str, str]:
         return (_normalise_name(team_a), _normalise_name(team_b), match_date.isoformat(), stage)
 
-    def _lightgbm_feature_names(self) -> list[str]:
+    def _lightgbm_feature_names(self, model_key: str = "result") -> list[str]:
         if self.lightgbm_model is None:
             return list(NEUTRAL_FEATURES)
-        return list(self.lightgbm_model.get("features", NEUTRAL_FEATURES))
+        legacy_features = list(self.lightgbm_model.get("features", NEUTRAL_FEATURES))
+        feature_fields = {
+            "team_a_goals": "team_a_goal_features",
+            "team_b_goals": "team_b_goal_features",
+            "result": "result_features",
+            "xg_result": "xg_result_features",
+        }
+        return list(self.lightgbm_model.get(feature_fields.get(model_key, "features"), legacy_features))
 
-    def _lightgbm_frame(self, rows: list[dict[str, Any]]) -> pd.DataFrame:
-        features = self._lightgbm_feature_names()
+    def _lightgbm_frame(
+        self,
+        rows: list[dict[str, Any]],
+        features: list[str] | None = None,
+    ) -> pd.DataFrame:
+        features = features if features is not None else self._lightgbm_feature_names()
         frame = add_neutral_treated_features(pd.DataFrame(rows))
         for feature in features:
             if feature not in frame:
@@ -1611,6 +1779,28 @@ class WorldCup2026Simulator:
         for column in frame.columns.difference(categorical):
             frame[column] = pd.to_numeric(frame[column], errors="coerce").fillna(0)
         return frame
+
+    def _lightgbm_prediction_frames(self, rows: list[dict[str, Any]]) -> dict[str, pd.DataFrame]:
+        feature_sets = {
+            "team_a_goals": self._lightgbm_feature_names("team_a_goals"),
+            "team_b_goals": self._lightgbm_feature_names("team_b_goals"),
+            "result": self._lightgbm_feature_names("result"),
+            "xg_result": self._lightgbm_feature_names("xg_result"),
+        }
+        all_features = list(dict.fromkeys(feature for values in feature_sets.values() for feature in values))
+        frame = self._lightgbm_frame(rows, all_features)
+        return {name: frame[features] for name, features in feature_sets.items()}
+
+    def _lightgbm_result_probabilities(self, frames: dict[str, pd.DataFrame]) -> Any:
+        probabilities = self.lightgbm_model["result_model"].predict_proba(frames["result"])
+        xg_model = self.lightgbm_model.get("xg_result_model")
+        if xg_model is None:
+            return probabilities
+        return blend_result_probabilities(
+            probabilities,
+            xg_model.predict_proba(frames["xg_result"]),
+            weight=float(self.lightgbm_model.get("result_probability_blend_weight", 0.50)),
+        )
 
     def _precompute_lightgbm_cache(self) -> None:
         teams = sorted({team for group in self.groups.values() for team in group})
@@ -1652,11 +1842,11 @@ class WorldCup2026Simulator:
                         )
                     )
 
-        frame = self._lightgbm_frame([row for _, row, _, _, _ in requests])
+        frames = self._lightgbm_prediction_frames([row for _, row, _, _, _ in requests])
 
-        team_a_goals = self.lightgbm_model["team_a_goals_model"].predict(frame)
-        team_b_goals = self.lightgbm_model["team_b_goals_model"].predict(frame)
-        probabilities = self.lightgbm_model["result_model"].predict_proba(frame)
+        team_a_goals = self.lightgbm_model["team_a_goals_model"].predict(frames["team_a_goals"])
+        team_b_goals = self.lightgbm_model["team_b_goals_model"].predict(frames["team_b_goals"])
+        probabilities = self._lightgbm_result_probabilities(frames)
         for index, (key, _, team_a, team_b, match_date) in enumerate(requests):
             self.prediction_cache[key] = {
                 "team_a_goals": max(0.15, float(team_a_goals[index])),
@@ -1688,10 +1878,16 @@ class WorldCup2026Simulator:
                 self.prediction_cache[cache_key] = prediction
             return prediction
         row = self._lightgbm_features(team_a, team_b, match_date, stage, group_table)
-        frame = self._lightgbm_frame([row])
-        team_a_goals = max(0.15, float(self.lightgbm_model["team_a_goals_model"].predict(frame)[0]))
-        team_b_goals = max(0.15, float(self.lightgbm_model["team_b_goals_model"].predict(frame)[0]))
-        probabilities = self.lightgbm_model["result_model"].predict_proba(frame)[0]
+        frames = self._lightgbm_prediction_frames([row])
+        team_a_goals = max(
+            0.15,
+            float(self.lightgbm_model["team_a_goals_model"].predict(frames["team_a_goals"])[0]),
+        )
+        team_b_goals = max(
+            0.15,
+            float(self.lightgbm_model["team_b_goals_model"].predict(frames["team_b_goals"])[0]),
+        )
+        probabilities = self._lightgbm_result_probabilities(frames)[0]
         prediction = {
             "team_a_goals": team_a_goals,
             "team_b_goals": team_b_goals,
@@ -1796,6 +1992,10 @@ class WorldCup2026Simulator:
         match_date: date,
         a_goals: int,
         b_goals: int,
+        *,
+        stage: str,
+        winner: str | None,
+        decided_by: str = "",
     ) -> None:
         a_key = _normalise_name(team_a)
         b_key = _normalise_name(team_b)
@@ -1875,16 +2075,100 @@ class WorldCup2026Simulator:
             b_fifa_key,
             self.fallback_fifa_points,
         )
-        updated_a, updated_b = update_live_fifa_points(
-            a_points,
-            b_points,
+        penalty_winner = winner if "penalt" in decided_by else ""
+        extra_time_winner = winner if "extra_time" in decided_by else ""
+        a_result, b_result = self._fifa_sum_results(
+            team_a,
+            team_b,
             a_goals,
             b_goals,
+            penalty_winner=penalty_winner or "",
+            extra_time_winner=extra_time_winner or "",
+        )
+        updated_a, updated_b = update_fifa_sum_points(
+            a_points,
+            b_points,
+            team_a_result=a_result,
+            team_b_result=b_result,
+            importance=fifa_sum_match_importance(
+                "FIFA World Cup",
+                "major_tournament",
+                stage,
+            ),
+            protect_negative=stage != "GROUP_STAGE",
         )
         self.fifa_point_overrides[a_fifa_key] = updated_a
         self.fifa_point_overrides[b_fifa_key] = updated_b
         # Rating-dependent predictions computed before this result are stale.
         self.prediction_cache.clear()
+
+    def _resolve_knockout_draw_after_90(
+        self,
+        team_a: str,
+        team_b: str,
+        match_date: date,
+        stage: str,
+        match_id: int | str | None,
+        group: str | None,
+        a_goals_90: int,
+        b_goals_90: int,
+        xg_90_a: float,
+        xg_90_b: float,
+    ) -> tuple[int, int, str]:
+        """Resolve a knockout draw while preserving the regulation score everywhere."""
+
+        extra_time_lambda_a, extra_time_lambda_b = self.extra_time_model.expected_goals(
+            xg_90_a,
+            xg_90_b,
+        )
+        extra_time_goals_a = _poisson_sample(extra_time_lambda_a, self.rng)
+        extra_time_goals_b = _poisson_sample(extra_time_lambda_b, self.rng)
+        penalty_probability_a: float | None = None
+        penalty_winner: str | None = None
+        if extra_time_goals_a > extra_time_goals_b:
+            winner = team_a
+            decided_by = "extra_time"
+        elif extra_time_goals_b > extra_time_goals_a:
+            winner = team_b
+            decided_by = "extra_time"
+        else:
+            decided_by = "penalties"
+            penalty_probability_a = self.penalty_model.team_a_probability(
+                team_a,
+                team_b,
+                match_date,
+            )
+            winner = team_a if self.rng.random() < penalty_probability_a else team_b
+            penalty_winner = winner
+
+        self._record_simulated_match(
+            team_a,
+            team_b,
+            match_date,
+            a_goals_90,
+            b_goals_90,
+            stage=stage,
+            winner=winner,
+            decided_by=decided_by,
+        )
+        self._record_match_trace(
+            match_id,
+            stage,
+            group,
+            team_a,
+            team_b,
+            a_goals_90,
+            b_goals_90,
+            winner,
+            decided_by=decided_by,
+            penalty_winner=penalty_winner,
+            penalty_team_a_probability=penalty_probability_a,
+            extra_time_goals_a=extra_time_goals_a,
+            extra_time_goals_b=extra_time_goals_b,
+            extra_time_lambda_a=extra_time_lambda_a,
+            extra_time_lambda_b=extra_time_lambda_b,
+        )
+        return a_goals_90, b_goals_90, winner
 
     def simulate_match(
         self,
@@ -1903,6 +2187,7 @@ class WorldCup2026Simulator:
             winner = manual_result["winner"]
             decided_by = "manual_result"
             penalty_winner = manual_result.get("penalty_winner")
+            extra_time_winner = manual_result.get("extra_time_winner")
             penalty_probability_a = None
             if not winner:
                 winner = team_a if a_goals > b_goals else team_b if b_goals > a_goals else None
@@ -1914,7 +2199,23 @@ class WorldCup2026Simulator:
                 winner = penalty_winner
                 decided_by = "manual_penalties"
                 penalty_probability_a = self.penalty_model.team_a_probability(team_a, team_b, match_date)
-            self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
+            elif (
+                winner == "Draw"
+                and stage != "GROUP_STAGE"
+                and extra_time_winner in {team_a, team_b}
+            ):
+                winner = extra_time_winner
+                decided_by = "manual_extra_time"
+            self._record_simulated_match(
+                team_a,
+                team_b,
+                match_date,
+                a_goals,
+                b_goals,
+                stage=stage,
+                winner=winner,
+                decided_by=decided_by,
+            )
             self._record_match_trace(
                 match_id,
                 stage,
@@ -1943,55 +2244,77 @@ class WorldCup2026Simulator:
             a_goals, b_goals = self._align_score_to_result(a_goals, b_goals, sampled_result)
             winner = team_a if sampled_result == "team_a" else team_b if sampled_result == "team_b" else None
             if sampled_result == "draw" and stage != "GROUP_STAGE":
-                penalty_probability_a = self.penalty_model.team_a_probability(team_a, team_b, match_date)
-                winner = team_a if self.rng.random() < penalty_probability_a else team_b
-                self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
-                self._record_match_trace(
-                    match_id,
-                    stage,
-                    group,
+                return self._resolve_knockout_draw_after_90(
                     team_a,
                     team_b,
+                    match_date,
+                    stage,
+                    match_id,
+                    group,
                     a_goals,
                     b_goals,
-                    winner,
-                    decided_by="penalties",
-                    penalty_winner=winner,
-                    penalty_team_a_probability=penalty_probability_a,
+                    a_lambda,
+                    b_lambda,
                 )
-                return a_goals, b_goals, winner
-            self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
+            self._record_simulated_match(
+                team_a,
+                team_b,
+                match_date,
+                a_goals,
+                b_goals,
+                stage=stage,
+                winner=winner,
+            )
             self._record_match_trace(match_id, stage, group, team_a, team_b, a_goals, b_goals, winner)
             return a_goals, b_goals, winner
         if a_goals > b_goals:
             winner = team_a
-            self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
+            self._record_simulated_match(
+                team_a,
+                team_b,
+                match_date,
+                a_goals,
+                b_goals,
+                stage=stage,
+                winner=winner,
+            )
             self._record_match_trace(match_id, stage, group, team_a, team_b, a_goals, b_goals, winner)
             return a_goals, b_goals, winner
         if b_goals > a_goals:
             winner = team_b
-            self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
+            self._record_simulated_match(
+                team_a,
+                team_b,
+                match_date,
+                a_goals,
+                b_goals,
+                stage=stage,
+                winner=winner,
+            )
             self._record_match_trace(match_id, stage, group, team_a, team_b, a_goals, b_goals, winner)
             return a_goals, b_goals, winner
         if stage != "GROUP_STAGE":
-            penalty_probability_a = self.penalty_model.team_a_probability(team_a, team_b, match_date)
-            winner = team_a if self.rng.random() < penalty_probability_a else team_b
-            self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
-            self._record_match_trace(
-                match_id,
-                stage,
-                group,
+            return self._resolve_knockout_draw_after_90(
                 team_a,
                 team_b,
+                match_date,
+                stage,
+                match_id,
+                group,
                 a_goals,
                 b_goals,
-                winner,
-                decided_by="penalties",
-                penalty_winner=winner,
-                penalty_team_a_probability=penalty_probability_a,
+                a_lambda,
+                b_lambda,
             )
-            return a_goals, b_goals, winner
-        self._record_simulated_match(team_a, team_b, match_date, a_goals, b_goals)
+        self._record_simulated_match(
+            team_a,
+            team_b,
+            match_date,
+            a_goals,
+            b_goals,
+            stage=stage,
+            winner=None,
+        )
         self._record_match_trace(match_id, stage, group, team_a, team_b, a_goals, b_goals, None)
         return a_goals, b_goals, None
 
@@ -2009,7 +2332,12 @@ class WorldCup2026Simulator:
         decided_by: str = "regular",
         penalty_winner: str | None = None,
         penalty_team_a_probability: float | None = None,
+        extra_time_goals_a: int | None = None,
+        extra_time_goals_b: int | None = None,
+        extra_time_lambda_a: float | None = None,
+        extra_time_lambda_b: float | None = None,
     ) -> None:
+        extra_time_played = extra_time_goals_a is not None and extra_time_goals_b is not None
         self.current_match_records.append(
             {
                 "match_id": match_id or "",
@@ -2020,6 +2348,20 @@ class WorldCup2026Simulator:
                 "team_a_goals": a_goals,
                 "team_b_goals": b_goals,
                 "total_goals": a_goals + b_goals,
+                "team_a_goals_90": a_goals,
+                "team_b_goals_90": b_goals,
+                "total_goals_90": a_goals + b_goals,
+                "extra_time_played": extra_time_played,
+                "team_a_extra_time_goals": extra_time_goals_a,
+                "team_b_extra_time_goals": extra_time_goals_b,
+                "team_a_extra_time_xg": extra_time_lambda_a,
+                "team_b_extra_time_xg": extra_time_lambda_b,
+                "team_a_goals_after_extra_time": (
+                    a_goals + int(extra_time_goals_a) if extra_time_played else None
+                ),
+                "team_b_goals_after_extra_time": (
+                    b_goals + int(extra_time_goals_b) if extra_time_played else None
+                ),
                 "winner": winner or "draw",
                 "decided_by": decided_by,
                 "penalty_winner": penalty_winner or "",
@@ -2144,8 +2486,7 @@ class WorldCup2026Simulator:
     def simulate_tournament(
         self,
     ) -> tuple[str, dict[str, str], dict[str, list[TeamStanding]], list[TeamStanding]]:
-        self.simulated_histories = defaultdict(list)
-        self.current_match_records = []
+        self._reset_tournament_state()
         standings = self.simulate_groups()
         thirds = self._best_thirds(standings)
         third_place_match_assignments = self._third_place_match_assignments(thirds)
@@ -2202,10 +2543,11 @@ class WorldCup2026Simulator:
         for match_id, previous_a, previous_b in SEMI_FINALS:
             team_a = winners[previous_a]
             team_b = winners[previous_b]
+            semifinal_date = date(2026, 7, 14) if match_id == 101 else date(2026, 7, 15)
             _, _, winner = self.simulate_match(
                 team_a,
                 team_b,
-                date(2026, 7, 14),
+                semifinal_date,
                 "SEMI_FINALS",
                 match_id=match_id,
             )
@@ -2410,7 +2752,11 @@ def run_worldcup_simulation(
         group: str = "",
         match_date_override: date | None = None,
     ) -> tuple[dict[str, Any], str]:
-        match_date = match_date_override or match_dates[stage]
+        match_date = match_date_override or (
+            date(2026, 7, 15)
+            if stage == "SEMI_FINALS" and match_id == 102
+            else match_dates[stage]
+        )
         if simulator.engine == "lightgbm" and simulator.lightgbm_model is not None:
             prediction = simulator.lightgbm_prediction(team_a, team_b, match_date, stage)
             expected_a = float(prediction["team_a_goals"])
@@ -2432,8 +2778,26 @@ def run_worldcup_simulation(
             if stage == "GROUP_STAGE"
             else simulator.penalty_model.team_a_probability(team_a, team_b, match_date)
         )
-        probability_advance_a = probability_a + probability_draw * penalty_probability_a
-        probability_advance_b = probability_b + probability_draw * (1 - penalty_probability_a)
+        if stage == "GROUP_STAGE":
+            extra_time_probability_a = 0.0
+            extra_time_draw_probability = 0.0
+            extra_time_probability_b = 0.0
+            conditional_advance_a = 0.0
+        else:
+            extra_time_outcomes = simulator.extra_time_model.predictor.outcome_probabilities(
+                expected_a,
+                expected_b,
+            )
+            extra_time_probability_a = extra_time_outcomes.team_a_win
+            extra_time_draw_probability = extra_time_outcomes.draw
+            extra_time_probability_b = extra_time_outcomes.team_b_win
+            conditional_advance_a = simulator.extra_time_model.team_a_advance_probability(
+                penalty_probability_a,
+                expected_a,
+                expected_b,
+            )
+        probability_advance_a = probability_a + probability_draw * conditional_advance_a
+        probability_advance_b = probability_b + probability_draw * (1 - conditional_advance_a)
         winner = team_a if probability_advance_a >= probability_advance_b else team_b
         result_label = "empate"
         if probability_a >= probability_draw and probability_a >= probability_b:
@@ -2453,8 +2817,15 @@ def run_worldcup_simulation(
             "prob_gana_a_en_partido": round(probability_a, 4),
             "prob_empate": round(probability_draw, 4),
             "prob_gana_b_en_partido": round(probability_b, 4),
+            "prob_a_gana_prorroga_si_empata_90": round(extra_time_probability_a, 4),
+            "prob_sigue_empate_tras_prorroga": round(extra_time_draw_probability, 4),
+            "prob_b_gana_prorroga_si_empata_90": round(extra_time_probability_b, 4),
             "prob_a_gana_penales_si_empata": round(penalty_probability_a, 4),
             "prob_b_gana_penales_si_empata": round(1 - penalty_probability_a, 4)
+            if stage != "GROUP_STAGE"
+            else 0.0,
+            "prob_a_avanza_si_empata_90": round(conditional_advance_a, 4),
+            "prob_b_avanza_si_empata_90": round(1 - conditional_advance_a, 4)
             if stage != "GROUP_STAGE"
             else 0.0,
             "prob_avanza_a": round(probability_advance_a, 4),

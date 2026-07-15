@@ -6,6 +6,7 @@ from kinela.fifa_ranking import (
     load_fifa_ranking_history,
     normalise_team_name,
     update_live_fifa_points,
+    update_fifa_sum_points,
 )
 
 
@@ -63,6 +64,33 @@ def test_live_fifa_points_downweight_friendly_result() -> None:
     assert abs(friendly_a - 1700.0) < abs(full_a - 1700.0)
     assert abs(friendly_b - 1400.0) < abs(full_b - 1400.0)
     assert friendly_a + friendly_b == 3100.0
+
+
+def test_fifa_sum_matches_published_qualifier_example() -> None:
+    underdog, favorite = update_fifa_sum_points(
+        1300.0,
+        1500.0,
+        team_a_result=1.0,
+        team_b_result=0.0,
+        importance=25.0,
+    )
+
+    assert round(underdog) == 1317
+    assert round(favorite) == 1483
+
+
+def test_fifa_sum_penalties_and_knockout_protection() -> None:
+    winner, loser = update_fifa_sum_points(
+        1800.0,
+        1500.0,
+        team_a_result=0.75,
+        team_b_result=0.5,
+        importance=60.0,
+        protect_negative=True,
+    )
+
+    assert winner == 1800.0
+    assert loser > 1500.0
 
 
 def test_provider_team_aliases_match_official_fifa_names() -> None:

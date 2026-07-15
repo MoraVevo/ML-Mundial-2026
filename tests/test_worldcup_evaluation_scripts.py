@@ -1,6 +1,7 @@
 import pandas as pd
 
 import scripts.generate_model_evaluation_report as report
+import scripts.update_worldcup2026_manual_detail_from_espn as espn_update
 import scripts.worldcup2026_model_metrics as model_metrics
 import scripts.worldcup2026_out_of_sample_comparison as oos_comparison
 
@@ -87,6 +88,79 @@ def test_latest_manual_result_date_uses_manual_file(tmp_path) -> None:
     )
 
     assert model_metrics._latest_manual_result_date(tmp_path) == "2026-06-24"
+
+
+def test_espn_knockout_sync_does_not_add_unfinished_events() -> None:
+    events = {
+        espn_update._team_key("Argentina", "Egypt"): {
+            "id": "760508",
+            "competitions": [
+                {
+                    "status": {"type": {"completed": False}},
+                    "competitors": [
+                        {"team": {"displayName": "Argentina"}, "score": "1"},
+                        {"team": {"displayName": "Egypt"}, "score": "0"},
+                    ],
+                }
+            ],
+        }
+    }
+
+    rows, added = espn_update._sync_finished_knockout_results([], events)
+
+    assert rows == []
+    assert added == []
+
+
+def test_espn_knockout_sync_treats_string_false_completed_as_unfinished() -> None:
+    events = {
+        espn_update._team_key("Argentina", "Egypt"): {
+            "id": "760508",
+            "competitions": [
+                {
+                    "status": {"type": {"completed": "false"}},
+                    "competitors": [
+                        {"team": {"displayName": "Argentina"}, "score": "1"},
+                        {"team": {"displayName": "Egypt"}, "score": "0"},
+                    ],
+                }
+            ],
+        }
+    }
+
+    rows, added = espn_update._sync_finished_knockout_results([], events)
+
+    assert rows == []
+    assert added == []
+
+
+def test_espn_knockout_sync_adds_only_completed_events() -> None:
+    events = {
+        espn_update._team_key("Argentina", "Egypt"): {
+            "id": "760508",
+            "competitions": [
+                {
+                    "status": {"type": {"completed": True}},
+                    "competitors": [
+                        {
+                            "team": {"displayName": "Argentina"},
+                            "score": "2",
+                            "winner": True,
+                        },
+                        {"team": {"displayName": "Egypt"}, "score": "0"},
+                    ],
+                }
+            ],
+        }
+    }
+
+    rows, added = espn_update._sync_finished_knockout_results([], events)
+
+    assert len(rows) == 1
+    assert added == rows
+    assert rows[0]["match_id"] == "95"
+    assert rows[0]["winner"] == "Argentina"
+    assert rows[0]["source"] == "ESPN event 760508; elimination bracket metadata"
 
 
 def test_walkforward_split_uses_prior_rows_and_target_only() -> None:

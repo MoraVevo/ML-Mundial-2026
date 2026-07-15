@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "model": "independent_poisson_extra_time_goals",
+  "selected_candidate": "equal_split",
+  "total_goal_lambda": 0.6206896551724138,
+  "allocation_exponent": 0.0,
+  "training_matches": 29,
+  "training_extra_time_goals": 18,
+  "training_tournaments": [
+    "African Cup of Nations 2023",
+    "Copa America 2024",
+    "FIFA World Cup 2018",
+    "FIFA World Cup 2022",
+    "UEFA Euro 2020",
+    "UEFA Euro 2024"
+  ],
+  "observed_outcomes": {
+    "draw": 20,
+    "team_a": 6,
+    "team_b": 3
+  },
+  "validation": {
+    "method": "leave-one-tournament-out",
+    "candidates": {
+      "equal_split": {
+        "poisson_nll_per_team": 0.7124892799871547,
+        "goal_mae_per_team": 0.4523809523809526,
+        "three_way_outcome_accuracy": 0.6896551724137931
+      },
+      "quarter_strength_split": {
+        "poisson_nll_per_team": 0.7108914065784634,
+        "goal_mae_per_team": 0.45164923076535596,
+        "three_way_outcome_accuracy": 0.6896551724137931
+      },
+      "half_strength_split": {
+        "poisson_nll_per_team": 0.7117984155716941,
+        "goal_mae_per_team": 0.45100995495999285,
+        "three_way_outcome_accuracy": 0.6896551724137931
+      },
+      "proportional_strength_split": {
+        "poisson_nll_per_team": 0.7205993570052047,
+        "goal_mae_per_team": 0.4502677536877745,
+        "three_way_outcome_accuracy": 0.6896551724137931
+      }
+    },
+    "raw_best_candidate": "quarter_strength_split",
+    "raw_best_relative_nll_improvement_vs_equal": 0.0022426630878153537,
+    "raw_best_bootstrap": {
+      "mean_nll_delta_per_match_vs_equal": -0.00319574681738263,
+      "ci95_low": -0.02026423755581342,
+      "ci95_high": 0.01145287445833243,
+      "probability_candidate_better": 0.63815
+    },
+    "selection_rule": "Use a strength split only with >=1% NLL improvement and a bootstrap 95% interval wholly below zero; otherwise retain the neutral equal split."
+  },
+  "data_policy": {
+    "regulation_periods": [
+      1,
+      2
+    ],
+    "extra_time_periods": [
+      3,
+      4
+    ],
+    "shootout_period": 5,
+    "source": "StatsBomb Open Data",
+    "attribution": "Data provided by StatsBomb",
+    "api_football_rows_used": 0,
+    "api_football_exclusion_reason": "Fixture-level status is not sufficient to distinguish true extra time from competitions that go directly to penalties; event periods are required."
+  }
+}

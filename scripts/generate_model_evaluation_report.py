@@ -24,8 +24,11 @@ from sklearn.metrics import (  # noqa: E402
 
 from kinela.lightgbm_model import (  # noqa: E402
     CATEGORICAL_FEATURES,
-    NEUTRAL_FEATURES,
+    NEUTRAL_BASE_RESULT_FEATURES,
+    NEUTRAL_GOAL_FEATURES,
     NEUTRAL_MODEL_RECIPE,
+    NEUTRAL_RESULT_FEATURES,
+    NEUTRAL_XG_RESULT_BLEND_WEIGHT,
     _build_neutral_frame,
     _calibrated_classifier_importances,
     _maybe_add_clinical_finishing,
@@ -33,6 +36,7 @@ from kinela.lightgbm_model import (  # noqa: E402
     _maybe_add_counter_efficiency,
     _maybe_add_late85_points_swing,
     _maybe_add_score_timing,
+    blend_result_probabilities,
 )
 
 
@@ -44,10 +48,14 @@ REG_PARAMS = {
     "objective": "regression",
     "n_estimators": 350,
     "learning_rate": 0.035,
-    "num_leaves": 23,
-    "min_child_samples": 35,
-    "subsample": 0.85,
-    "colsample_bytree": 0.85,
+    "num_leaves": 12,
+    "max_depth": 4,
+    "min_child_samples": 60,
+    "subsample": 0.82,
+    "colsample_bytree": 0.82,
+    "reg_alpha": 0.10,
+    "reg_lambda": 1.0,
+    "min_split_gain": 0.005,
     "random_state": RANDOM_SEED,
     "verbosity": -1,
 }
@@ -55,10 +63,14 @@ CLF_PARAMS = {
     "objective": "multiclass",
     "n_estimators": 300,
     "learning_rate": 0.035,
-    "num_leaves": 23,
-    "min_child_samples": 35,
-    "subsample": 0.85,
-    "colsample_bytree": 0.85,
+    "num_leaves": 12,
+    "max_depth": 4,
+    "min_child_samples": 60,
+    "subsample": 0.82,
+    "colsample_bytree": 0.82,
+    "reg_alpha": 0.10,
+    "reg_lambda": 1.0,
+    "min_split_gain": 0.005,
     "random_state": RANDOM_SEED,
     "verbosity": -1,
 }
@@ -268,39 +280,57 @@ def _evaluate(
     if train.empty or test.empty:
         raise RuntimeError(f"{name} produced an empty train or test split")
 
-    features = list(NEUTRAL_FEATURES)
-    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in features]
+    goal_features = list(NEUTRAL_GOAL_FEATURES)
+    base_result_features = list(NEUTRAL_BASE_RESULT_FEATURES)
+    result_features = list(NEUTRAL_RESULT_FEATURES)
+    categorical = [feature for feature in CATEGORICAL_FEATURES if feature in goal_features]
+    result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in result_features]
+    base_result_categorical = [feature for feature in CATEGORICAL_FEATURES if feature in base_result_features]
     weights = train["match_recency_weight"].astype(float).to_numpy(copy=True)
 
     team_a_model = lgb.LGBMRegressor(**REG_PARAMS)
     team_b_model = lgb.LGBMRegressor(**REG_PARAMS)
     team_a_model.fit(
-        train[features],
+        train[goal_features],
         train["team_a_goals"],
         sample_weight=weights,
         categorical_feature=categorical,
     )
     team_b_model.fit(
-        train[features],
+        train[goal_features],
         train["team_b_goals"],
         sample_weight=weights,
         categorical_feature=categorical,
     )
-    pred_a = np.clip(team_a_model.predict(test[features]), 0.0, None)
-    pred_b = np.clip(team_b_model.predict(test[features]), 0.0, None)
+    pred_a = np.clip(team_a_model.predict(test[goal_features]), 0.0, None)
+    pred_b = np.clip(team_b_model.predict(test[goal_features]), 0.0, None)
 
-    classifier = CalibratedClassifierCV(
+    base_classifier = CalibratedClassifierCV(
         lgb.LGBMClassifier(**CLF_PARAMS),
         method="sigmoid",
         cv=3,
     )
-    classifier.fit(
-        train[features],
+    base_classifier.fit(
+        train[base_result_features],
         train["result_label"],
         sample_weight=weights,
-        categorical_feature=categorical,
+        categorical_feature=base_result_categorical,
     )
-    probabilities = classifier.predict_proba(test[features])
+    xg_classifier = CalibratedClassifierCV(
+        lgb.LGBMClassifier(**CLF_PARAMS),
+        method="sigmoid",
+        cv=3,
+    )
+    xg_classifier.fit(
+        train[result_features],
+        train["result_label"],
+        sample_weight=weights,
+        categorical_feature=result_categorical,
+    )
+    probabilities = blend_result_probabilities(
+        base_classifier.predict_proba(test[base_result_features]),
+        xg_classifier.predict_proba(test[result_features]),
+    )
     labels = test["result_label"].astype(int).to_numpy()
     predicted = probabilities.argmax(axis=1)
     mae_a = float(mean_absolute_error(test["team_a_goals"], pred_a))
@@ -342,9 +372,16 @@ def _evaluate(
         metrics=metrics,
         confusion=confusion_matrix(labels, predicted, labels=[0, 1, 2]).tolist(),
         feature_importances={
-            "result_classifier": _calibrated_classifier_importances(classifier, features),
-            "team_a_goals": _importances(team_a_model, features),
-            "team_b_goals": _importances(team_b_model, features),
+            "result_classifier": _calibrated_classifier_importances(
+                xg_classifier,
+                result_features,
+            ),
+            "base_result_classifier": _calibrated_classifier_importances(
+                base_classifier,
+                goal_features,
+            ),
+            "team_a_goals": _importances(team_a_model, goal_features),
+            "team_b_goals": _importances(team_b_model, goal_features),
         },
         test_competitions={
             str(key): int(value)
@@ -459,6 +496,7 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         "quality_form_edge": "Forma reciente ajustada por calidad del rival, no solo puntos crudos.",
         "goal_balance_edge": "Diferencia de balance goleador reciente e historico: goles a favor menos goles recibidos.",
         "draw_pressure_index": "Indice de paridad y baja separacion esperada; ayuda a calibrar partidos cerrados.",
+        "score_timing_edge": "Ventaja validada de score timing: cuanto controlo el marcador, que tan temprano golpeo, si rescato o perdio puntos tarde, y cuanto tiempo paso persiguiendo el partido.",
         "score_control_value_edge": "Ventaja en control de marcador: capacidad reciente de sostener o transformar estados de partido.",
         "quality_score_control_swing_edge": "Control de marcador ajustado por calidad del rival y cambios tempranos de estado; prioriza senales de resultado sobre marcador exacto.",
         "rating_guardrail_edge": "Correccion de seguridad cuando las senales de amenaza se alejan demasiado del rating base.",
@@ -480,7 +518,10 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         "worldcup_fotmob_current_low_block_solution_edge": "Respuesta mostrada en el Mundial actual frente a perfiles de bloque bajo, usando amenaza real y riesgo de control esteril.",
         "worldcup_fotmob_current_transition_punch_edge": "Peligro de transicion observado en el Mundial actual: generar sin mucha posesion, especialmente util ante rivales que conceden espacio.",
         "worldcup_fotmob_current_unrewarded_pressure_edge": "Partidos recientes del Mundial actual donde el equipo genero suficiente amenaza aunque el marcador no lo reflejara.",
-        "worldcup_fotmob_current_story_edge": "Lectura conservadora del Mundial actual: capacidad reciente de transformar amenaza real en soluciones contra rivales que pueden defender bajo, evitando la mezcla mas ruidosa de todos los microeventos.",
+        "worldcup_fotmob_current_controlled_dominance_edge": "Dominio controlado en el Mundial actual: amenaza y control de ocasiones con defensa estable, penalizando desperdicio y posesion esteril.",
+        "worldcup_fotmob_current_story_edge": "Lectura conservadora del Mundial actual: dominio controlado, presion de ocasiones, soluciones ante bloque bajo, transicion y presion no premiada, siempre con cobertura bilateral.",
+        "worldcup_fotmob_xg_matchup_team_a": "xG esperado para el Equipo A: mitad de su xG creado y mitad del xG que concede el rival, con mezcla de historial mundialista y torneo actual.",
+        "worldcup_fotmob_xg_matchup_team_b": "xG esperado para el Equipo B con la misma construccion neutral y prepartido.",
     }
     draw_notes = []
     for result in results:
@@ -629,13 +670,17 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
         [
             "## Construccion de features",
             "",
-            f"El modelo activo usa {len(NEUTRAL_FEATURES)} features prepartido:",
+            (
+                f"El modelo activo usa {len(NEUTRAL_GOAL_FEATURES)} features prepartido "
+                f"en su base y {len(NEUTRAL_RESULT_FEATURES)} en el clasificador xG paralelo "
+                f"(mezcla de probabilidades {NEUTRAL_XG_RESULT_BLEND_WEIGHT:.0%}/{NEUTRAL_XG_RESULT_BLEND_WEIGHT:.0%})."
+            ),
             "",
             "| Feature | Significado |",
             "|---|---|",
         ]
     )
-    for feature in NEUTRAL_FEATURES:
+    for feature in NEUTRAL_RESULT_FEATURES:
         lines.append(f"| `{feature}` | {feature_descriptions.get(feature, '')} |")
     lines.extend(
         [
@@ -645,7 +690,8 @@ def _write_markdown(results: list[EvaluationResult], asset_dir: Path, output: Pa
             "- Fuerza/rating: ranking FIFA, fuerza tipo Elo y guardrails de ranking.",
             "- Forma reciente: puntos ajustados por rival y balance de goles.",
             "- Contexto del partido: tipo de competicion, fase/ronda y presion de empate.",
-            "- Perfil tactico/ofensivo: compatibilidad de guion de partido y matchup contra bloque bajo.",
+            "- Perfil ofensivo del Mundial actual: score timing, control de ocasiones, dominio controlado y finalizador diferencial.",
+            "- xG de matchup: xG que cada equipo crea combinado con xG que el rival concede; solo entra al clasificador xG paralelo, no a los regresores de goles.",
             "",
             "Quedan fuera de los features: goles objetivo, resultado final, ids crudos, fecha cruda, equipos, fuente y estadisticas postpartido del encuentro evaluado.",
             "",
@@ -730,7 +776,9 @@ def main() -> None:
     payload = {
         "model": "lightgbm_neutral",
         "model_id": NEUTRAL_MODEL_RECIPE,
-        "features": list(NEUTRAL_FEATURES),
+        "goal_features": list(NEUTRAL_GOAL_FEATURES),
+        "result_features": list(NEUTRAL_RESULT_FEATURES),
+        "xg_result_blend_weight": NEUTRAL_XG_RESULT_BLEND_WEIGHT,
         "evaluations": [result.__dict__ for result in results],
     }
     summary_path = args.asset_dir / "summary.json"

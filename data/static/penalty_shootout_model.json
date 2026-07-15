@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "model_id": "neutral_penalty_v2_honest_coin_baseline",
+  "model_type": "coin_flip",
+  "trained_through": "2026-07-07",
+  "source": "martj42/international_results CC0-1.0",
+  "training_matches": 570,
+  "features": [],
+  "selection_metrics_pre_2018": {
+    "matches": 169,
+    "decisive_predictions": 0,
+    "unresolved_50_50_predictions": 169,
+    "expected_correct": 84.5,
+    "accuracy": 0.5,
+    "accuracy_wilson_95": [
+      0.4255,
+      0.5745
+    ],
+    "decisive_accuracy": null,
+    "log_loss": 0.693147,
+    "brier": 0.25,
+    "roc_auc": null,
+    "mean_confidence": 0.5
+  },
+  "probability_policy": "Neutral and symmetric. Exact 50/50 is retained when no candidate improves proper scoring rules out of sample.",
+  "probability": 0.5
+}

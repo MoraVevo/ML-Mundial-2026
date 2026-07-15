@@ -62,22 +62,7 @@ def _drop_round_of_32_from_feature_context(simulator: WorldCup2026Simulator) -> 
         row for row in simulator.history if not _is_round_of_32_history_row(row)
     ]
     removed = original_count - len(simulator.history)
-    simulator.team_histories = simulator._index_team_histories()
-    simulator.head_to_head_histories = simulator._index_head_to_head_histories()
-    simulator.elo_ratings = simulator._build_elo_ratings()
-    simulator.confederation_stats, simulator.team_cross_confederation_stats = (
-        simulator._build_confederation_contexts()
-    )
-    contexts = simulator._goal_contexts()
-    simulator.global_goal_avg = contexts["global_avg"]
-    simulator.major_goal_avg = contexts["major_avg"]
-    simulator.group_goal_avg = contexts["group_avg"]
-    simulator.knockout_goal_avg = contexts["knockout_avg"]
-    simulator.major_match_count = contexts["major_matches"]
-    simulator.group_match_count = contexts["group_matches"]
-    simulator.knockout_match_count = contexts["knockout_matches"]
-    simulator.fifa_point_overrides = simulator._build_fifa_point_overrides()
-    simulator.prediction_cache.clear()
+    simulator._refresh_derived_state()
     return removed
 
 
@@ -228,10 +213,11 @@ def _simulate_once(
     for match_id, previous_a, previous_b in SEMI_FINALS:
         team_a = winners[previous_a]
         team_b = winners[previous_b]
+        semifinal_date = date(2026, 7, 14) if match_id == 101 else date(2026, 7, 15)
         _a_goals, _b_goals, winner = simulator.simulate_match(
             team_a,
             team_b,
-            KNOCKOUT_DATES["SEMI_FINALS"],
+            semifinal_date,
             "SEMI_FINALS",
             match_id=match_id,
         )

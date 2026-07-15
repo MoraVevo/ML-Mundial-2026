@@ -3,6 +3,7 @@ import pandas as pd
 from kinela.lightgbm_model import add_score_timing_to_clean_frame
 from kinela.model import (
     _deduplicate_real_matches,
+    _manual_goal_events_from_notes,
     _valid_goal_events,
     _normalise_stage_or_round,
     _rolling_team_averages,
@@ -64,6 +65,41 @@ def test_score_timing_excludes_missed_and_shootout_penalties() -> None:
 
     assert valid == [events[0]]
     assert _valid_goal_events(events, "Alpha", "Beta", 2, 0) is None
+
+
+def test_manual_goal_notes_parse_multiple_minutes_and_ignore_disallowed_goals() -> None:
+    notes = (
+        "Final: South Korea 2-1 Czechia. Czechia led through Ladislav Krejci 59'; "
+        "South Korea scored through Hwang In-beom 67' and Oh Hyeon-gyu 80'. "
+        "Czechia had a Tomas Soucek goal ruled out for offside at 76'."
+    )
+
+    events = _manual_goal_events_from_notes(notes, "South Korea", "Czechia", 2, 1)
+    valid = _valid_goal_events(events, "South Korea", "Czechia", 2, 1)
+
+    assert valid is not None
+    assert [
+        (event["team"]["name"], event["time"]["elapsed"], event["time"].get("extra"))
+        for event in valid
+    ] == [
+        ("Czechia", 59, None),
+        ("South Korea", 67, None),
+        ("South Korea", 80, None),
+    ]
+
+
+def test_manual_goal_notes_parse_shutout_multi_goal_clause() -> None:
+    notes = (
+        "Final: Argentina 3-0 Algeria. Goals: Lionel Messi 17' 60' and 76' "
+        "for Argentina. No red cards reported by source."
+    )
+
+    events = _manual_goal_events_from_notes(notes, "Argentina", "Algeria", 3, 0)
+    valid = _valid_goal_events(events, "Argentina", "Algeria", 3, 0)
+
+    assert valid is not None
+    assert [event["time"]["elapsed"] for event in valid] == [17, 60, 76]
+    assert {event["team"]["name"] for event in valid} == {"Argentina"}
 
 
 def test_score_control_window_counts_matches_without_timeline(

@@ -6,6 +6,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 import sys
 
@@ -35,6 +36,19 @@ KNOCKOUT_MATCHES = [
     {"match_id": "86", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Argentina", "team_b": "Cape Verde Islands"},
     {"match_id": "87", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Colombia", "team_b": "Ghana"},
     {"match_id": "88", "date": "2026-07-03", "stage": "ROUND_OF_32", "team_a": "Australia", "team_b": "Egypt"},
+    {"match_id": "89", "date": "2026-07-04", "stage": "LAST_16", "team_a": "Paraguay", "team_b": "France"},
+    {"match_id": "90", "date": "2026-07-04", "stage": "LAST_16", "team_a": "Canada", "team_b": "Morocco"},
+    {"match_id": "91", "date": "2026-07-05", "stage": "LAST_16", "team_a": "Brazil", "team_b": "Norway"},
+    {"match_id": "92", "date": "2026-07-05", "stage": "LAST_16", "team_a": "Mexico", "team_b": "England"},
+    {"match_id": "93", "date": "2026-07-06", "stage": "LAST_16", "team_a": "Portugal", "team_b": "Spain"},
+    {"match_id": "94", "date": "2026-07-06", "stage": "LAST_16", "team_a": "United States", "team_b": "Belgium"},
+    {"match_id": "95", "date": "2026-07-07", "stage": "LAST_16", "team_a": "Argentina", "team_b": "Egypt"},
+    {"match_id": "96", "date": "2026-07-07", "stage": "LAST_16", "team_a": "Switzerland", "team_b": "Colombia"},
+    {"match_id": "97", "date": "2026-07-09", "stage": "QUARTER_FINALS", "team_a": "France", "team_b": "Morocco"},
+    {"match_id": "98", "date": "2026-07-10", "stage": "QUARTER_FINALS", "team_a": "Spain", "team_b": "Belgium"},
+    {"match_id": "99", "date": "2026-07-11", "stage": "QUARTER_FINALS", "team_a": "Norway", "team_b": "England", "team_a_goals_90": 1, "team_b_goals_90": 1},
+    {"match_id": "100", "date": "2026-07-11", "stage": "QUARTER_FINALS", "team_a": "Argentina", "team_b": "Switzerland", "team_a_goals_90": 1, "team_b_goals_90": 1},
+    {"match_id": "101", "date": "2026-07-14", "stage": "SEMI_FINALS", "team_a": "France", "team_b": "Spain"},
 ]
 
 ALIASES = {
@@ -105,6 +119,27 @@ def _event_score(event: dict) -> dict[str, int]:
     }
 
 
+def _event_is_after_extra_time(event: dict) -> bool:
+    competition = (event.get("competitions") or [{}])[0]
+    status = competition.get("status", {}).get("type", {})
+    return status.get("name") == "STATUS_FINAL_AET"
+
+
+def _event_regulation_score(event: dict) -> dict[str, int]:
+    competition = (event.get("competitions") or [{}])[0]
+    scores: dict[str, int] = {}
+    for item in competition.get("competitors", []):
+        team = item.get("team", {}).get("displayName", "")
+        if not team:
+            continue
+        lines = item.get("linescores") or []
+        if len(lines) >= 2:
+            scores[_norm(team)] = sum(int(float(line.get("displayValue") or 0)) for line in lines[:2])
+        else:
+            scores[_norm(team)] = int(item.get("score", 0))
+    return scores
+
+
 def _event_penalty_score(event: dict) -> dict[str, int]:
     competition = (event.get("competitions") or [{}])[0]
     scores: dict[str, int] = {}
@@ -129,11 +164,22 @@ def _event_winner(event: dict) -> str:
     return ""
 
 
+def _is_truthy_completed(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes"}
+    return False
+
+
 def _event_is_complete(event: dict) -> bool:
     competition = (event.get("competitions") or [{}])[0]
-    return bool(
-        competition.get("status", {}).get("type", {}).get("completed")
-        or event.get("status", {}).get("type", {}).get("completed")
+    return any(
+        _is_truthy_completed(value)
+        for value in (
+            competition.get("status", {}).get("type", {}).get("completed"),
+            event.get("status", {}).get("type", {}).get("completed"),
+        )
     )
 
 
@@ -169,7 +215,8 @@ def _sync_finished_results(
 
         if not espn_finished:
             continue
-        espn_score = _event_score(event)
+        after_extra_time = _event_is_after_extra_time(event)
+        espn_score = _event_regulation_score(event) if after_extra_time else _event_score(event)
         espn_goals_a = espn_score.get(_norm(team_a))
         espn_goals_b = espn_score.get(_norm(team_b))
         if espn_goals_a is None or espn_goals_b is None:
@@ -241,15 +288,18 @@ def _sync_finished_knockout_results(
         event = events.get(_team_key(match["team_a"], match["team_b"]))
         if not event or not _event_is_complete(event):
             continue
-        espn_score = _event_score(event)
-        goals_a = espn_score.get(_norm(match["team_a"]))
-        goals_b = espn_score.get(_norm(match["team_b"]))
+        after_extra_time = _event_is_after_extra_time(event)
+        espn_score = _event_regulation_score(event) if after_extra_time else _event_score(event)
+        goals_a = match.get("team_a_goals_90", espn_score.get(_norm(match["team_a"])))
+        goals_b = match.get("team_b_goals_90", espn_score.get(_norm(match["team_b"])))
         if goals_a is None or goals_b is None:
             continue
         penalty_score = _event_penalty_score(event)
         penalty_a = penalty_score.get(_norm(match["team_a"]))
         penalty_b = penalty_score.get(_norm(match["team_b"]))
-        penalty_winner = _event_winner(event) if penalty_a is not None and penalty_b is not None else ""
+        event_winner = _event_winner(event)
+        penalty_winner = event_winner if penalty_a is not None and penalty_b is not None else ""
+        extra_time_winner = event_winner if after_extra_time else ""
         winner = "Draw"
         if goals_a > goals_b:
             winner = match["team_a"]
@@ -275,9 +325,15 @@ def _sync_finished_knockout_results(
                 "team_a_penalty_goals": "" if penalty_a is None else str(penalty_a),
                 "team_b_penalty_goals": "" if penalty_b is None else str(penalty_b),
                 "penalty_winner": penalty_winner,
+                "extra_time_winner": extra_time_winner,
                 "source": f"ESPN event {event_id}; elimination bracket metadata",
                 "notes": (
-                    f"Final: {match['team_a']} {goals_a}-{goals_b} {match['team_b']}. "
+                    f"90 minutes: {match['team_a']} {goals_a}-{goals_b} {match['team_b']}. "
+                    + (
+                        f"{extra_time_winner} advanced after extra time. "
+                        if extra_time_winner
+                        else ""
+                    )
                     + (
                         f"Penalties: {match['team_a']} {penalty_a}-{penalty_b} "
                         f"{match['team_b']}; {penalty_winner} advanced. "
@@ -374,6 +430,7 @@ def main() -> None:
         "team_a_penalty_goals",
         "team_b_penalty_goals",
         "penalty_winner",
+        "extra_time_winner",
         "source",
         "notes",
     ]
@@ -392,6 +449,9 @@ def main() -> None:
             missing_events.append(manual)
             continue
         match_day = date.fromisoformat(manual["date"])
+        after_extra_time = bool(event and _event_is_after_extra_time(event)) or bool(
+            manual.get("extra_time_winner")
+        )
         stats_by_team = _summary_stats(
             client,
             event_id,
@@ -408,9 +468,16 @@ def main() -> None:
                 row["source"] = ""
                 row["notes"] = ""
                 rows_by_key[key] = row
+            if after_extra_time:
+                for field in DETAIL_FIELDS:
+                    row[field] = ""
+                row["notes"] = (
+                    "Full-match ESPN aggregates excluded because the match went to extra time; "
+                    "only verified 90-minute overlays may be used."
+                )
             values = stats_by_team.get(_norm(team), {})
             for field, value in values.items():
-                if field in DETAIL_FIELDS and value and not row.get(field):
+                if not after_extra_time and field in DETAIL_FIELDS and value and not row.get(field):
                     row[field] = value
                     updated_fields[field] += 1
             source = row.get("source", "")

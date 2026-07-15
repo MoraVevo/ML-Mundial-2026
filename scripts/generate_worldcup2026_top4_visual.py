@@ -62,6 +62,7 @@ def render_top4_visual(
     *,
     title: str,
     subtitle: str,
+    footer: str,
     limit: int,
 ) -> dict[str, list[dict[str, Any]]]:
     top_by_position = _top_by_position(payload, limit)
@@ -76,7 +77,7 @@ def render_top4_visual(
     fig.text(
         0.5,
         0.035,
-        "Modelo neutral LightGBM entrenado sin partidos del Mundial 2026; resultados jugados usados solo como estado del torneo.",
+        footer,
         ha="center",
         color="#cfe8c5",
         fontsize=10,
@@ -108,23 +109,42 @@ def main() -> None:
         if metadata.get("simulation_mode") == "full_context"
         else "FAST"
     )
+    model_label = str(metadata.get("model_label", ""))
+    model_path = str(metadata.get("model_path", ""))
+    is_all_played = "all_played" in model_label or "all_played" in model_path
+    model_policy = (
+        "worldcup_2026_all_played_for_future_prediction"
+        if is_all_played
+        else "worldcup_2026_out_of_sample_holdout"
+    )
+    evaluation_label = "all-played (100 resultados)" if is_all_played else "holdout out-of-sample"
+    footer = (
+        "LightGBM neutral all-played: incorpora los 100 partidos terminados; "
+        "solo predice los cruces futuros."
+        if is_all_played
+        else (
+            "LightGBM neutral de holdout: los partidos del Mundial 2026 se reservan "
+            "fuera del entrenamiento."
+        )
+    )
     top_by_position = render_top4_visual(
         payload,
         args.output,
         title="Mundial 2026: probabilidades Top 4",
         subtitle=(
-            f"{runs:,} simulaciones | {mode_label} | holdout out-of-sample | "
+            f"{runs:,} simulaciones | {mode_label} | {evaluation_label} | "
             "terceros exactos | penales"
         ),
+        footer=footer,
         limit=args.limit,
     )
     summary = {
         "source": str(args.input),
         "runs": runs,
         "seed": metadata["seed"],
-        "model_label": metadata.get("model_label", ""),
-        "model_path": metadata.get("model_path", ""),
-        "model_policy": "worldcup_2026_out_of_sample_holdout",
+        "model_label": model_label,
+        "model_path": model_path,
+        "model_policy": model_policy,
         "simulation_mode": metadata.get("simulation_mode", ""),
         "third_place_assignment": metadata.get("third_place_assignment", ""),
         "top_by_position": top_by_position,
